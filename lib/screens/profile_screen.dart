@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/navigation_providers.dart';
+import '../providers/notification_providers.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/ai_node_icon.dart';
 import 'login_screen.dart';
+
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -394,6 +397,73 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
+            // Notifications & Reminders
+            Text(
+              'Notifications & Alarms',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            _buildSwitchTile(
+              context: context,
+              icon: Icons.alarm_on_outlined,
+              iconColor: AppColors.primary,
+              title: '10-Min Pre-Class Alert',
+              subtitle: 'Alert 10 minutes before every scheduled class',
+              value: ref.watch(notificationSettingsProvider).classAlertsEnabled,
+              onChanged: (val) {
+                ref.read(notificationSettingsProvider.notifier).toggleClassAlerts(val);
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildSwitchTile(
+              context: context,
+              icon: Icons.wb_sunny_outlined,
+              iconColor: Colors.orange,
+              title: 'Daily Morning Briefing (7:30 AM)',
+              subtitle: 'Summary of today\'s scheduled classes & tasks',
+              value: ref.watch(notificationSettingsProvider).morningBriefingEnabled,
+              onChanged: (val) {
+                ref.read(notificationSettingsProvider.notifier).toggleMorningBriefing(val);
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildSwitchTile(
+              context: context,
+              icon: Icons.nights_stay_outlined,
+              iconColor: Colors.indigoAccent,
+              title: 'Nightly Schedule Preview (11:30 PM)',
+              subtitle: 'Preview of tomorrow\'s timetable and tasks',
+              value: ref.watch(notificationSettingsProvider).nightlyPreviewEnabled,
+              onChanged: (val) {
+                ref.read(notificationSettingsProvider.notifier).toggleNightlyPreview(val);
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildTile(
+              context: context,
+              icon: Icons.notifications_active_outlined,
+              iconColor: AppColors.secondary,
+              title: 'Test Notification System',
+              subtitle: 'Send an immediate test notification now',
+              onTap: () async {
+                await NotificationService().sendTestNotification();
+                if (context.mounted) {
+                  SnackbarUtils.showSuccess(context, 'Test notification sent!');
+                }
+              },
+            ),
+
+
+            const SizedBox(height: 24),
+
             // Quick Navigation Shortcuts
             Text(
               'Quick Navigation',
@@ -519,4 +589,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
   }
+
+  Widget _buildSwitchTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+      ),
+      child: SwitchListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        value: value,
+        onChanged: onChanged,
+        secondary: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        title: Text(
+          title,
+          style: GoogleFonts.spaceGrotesk(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
 }
+

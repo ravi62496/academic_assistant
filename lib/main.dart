@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
+import 'services/notification_service.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,5 +29,14 @@ Future<void> main() async {
     debugPrint('WARNING: Supabase URL or Anon Key missing from .env');
   }
 
-  runApp(const AcademicAssistantApp());
+  // Initialize notification service & permissions
+  try {
+    await NotificationService().initialize();
+    await NotificationService().requestPermissions();
+  } catch (e) {
+    debugPrint('Notification initialization error: $e');
+  }
+
+  runApp(const ProviderScope(child: AcademicAssistantApp()));
 }
+

@@ -1,21 +1,14 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:academic_assistant/services/notification_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:academic_assistant/app.dart';
-
 void main() {
-  testWidgets('App load smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const AcademicAssistantApp());
+  test('Time string parsing test', () {
+    final parsedMorning = NotificationService.parseTimeString('07:30');
+    expect(parsedMorning[0], 7);
+    expect(parsedMorning[1], 30);
 
-    // We can't verify 'Supabase connected ✅' anymore because the app routes to SignInScreen now.
-    // Instead we can just verify the app widget boots successfully.
-    expect(find.byType(AcademicAssistantApp), findsOneWidget);
+    final parsedNight = NotificationService.parseTimeString('23:30:00');
+    expect(parsedNight[0], 23);
+    expect(parsedNight[1], 30);
   });
 }
