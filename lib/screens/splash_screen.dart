@@ -1,24 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../theme/app_colors.dart';
 import 'auth_wrapper.dart';
 
-/// Sentry splash screen.
-///
-/// Usage (e.g. in main.dart):
-///
-///   MaterialApp(
-///     home: SplashScreen(nextScreen: const HomeScreen()),
-///   );
-///
-/// Uses the icon PNG from Assets/images/Sentry.png.
-///
-/// Animation sequence (total ~2.2s):
-/// 1. Icon scales up (80% -> 100%) while fading in (~0.2s–0.9s).
-/// 2. Brief pause (~0.9s–1.3s).
-/// 3. Icon pulses once (100% -> 112% -> 100%), like a single heartbeat (~1.3s–1.7s).
-/// 4. The "sentry" wordmark fades in and slides up slightly (~1.6s–2.2s).
-/// 5. Brief hold (~0.3s), then fades into [nextScreen].
+/// Fluid Sentry splash screen.
+/// Smooth 1.2s continuous spring entrance sequence without dead delays or frozen pauses.
 class SplashScreen extends StatefulWidget {
   final Widget? nextScreen;
   final VoidCallback? onAnimationComplete;
@@ -38,12 +26,9 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _iconAssetPath = 'Assets/images/Sentry.png';
-  static const _green = Color(0xFF1F9D55);
 
   late final AnimationController _controller;
-
-  late final Animation<double> _entranceScale;
-  late final Animation<double> _pulseScale;
+  late final Animation<double> _scaleAnimation;
   late final Animation<double> _iconOpacity;
   late final Animation<double> _wordmarkOpacity;
   late final Animation<Offset> _wordmarkOffset;
@@ -54,56 +39,42 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 1200),
     );
 
-    // Phase 1 (~0.2s-0.9s): icon scales + fades in.
-    _entranceScale = Tween(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.09, 0.41, curve: Curves.easeOut),
-      ),
-    );
-    _iconOpacity = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.09, 0.41, curve: Curves.easeOut),
-      ),
-    );
-
-    // Phase 2 (~1.3s-1.7s): icon pulses once.
-    _pulseScale = TweenSequence<double>([
+    // Immediate spring pop animation (0.0s - 1.2s)
+    _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.12)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(begin: 0.85, end: 1.08).chain(CurveTween(curve: Curves.easeOutBack)),
         weight: 60,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 1.12, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween(begin: 1.08, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 40,
       ),
-    ]).animate(
+    ]).animate(_controller);
+
+    _iconOpacity = Tween(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.59, 0.77, curve: Curves.linear),
+        curve: const Interval(0.0, 0.35, curve: Curves.easeIn),
       ),
     );
 
-    // Phase 3 (~1.6s-2.2s): wordmark fades in and slides up.
     _wordmarkOpacity = Tween(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.73, 1.0, curve: Curves.easeOut),
+        curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
       ),
     );
+
     _wordmarkOffset = Tween(
-      begin: const Offset(0, 0.4),
+      begin: const Offset(0, 0.25),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.73, 1.0, curve: Curves.easeOut),
+        curve: const Interval(0.2, 0.7, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -111,25 +82,30 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (!mounted) return;
-          if (widget.onAnimationComplete != null) {
-            widget.onAnimationComplete!();
-          } else if (widget.autoNavigate) {
-            final targetScreen = widget.nextScreen ?? const AuthWrapper();
-            Navigator.of(context).pushReplacement(
-              PageRouteBuilder(
-                transitionDuration: const Duration(milliseconds: 400),
-                pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
-                  opacity: animation,
-                  child: targetScreen,
-                ),
+        if (!mounted) return;
+        if (widget.onAnimationComplete != null) {
+          widget.onAnimationComplete!();
+        } else if (widget.autoNavigate) {
+          final targetScreen = widget.nextScreen ?? const AuthWrapper();
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 350),
+              pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
+                opacity: animation,
+                child: targetScreen,
               ),
-            );
-          }
-        });
+            ),
+          );
+        }
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pre-cache the asset image so rasterization happens instantly
+    precacheImage(const AssetImage(_iconAssetPath), context);
   }
 
   @override
@@ -140,35 +116,37 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? AppColors.darkBackground : Colors.white;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: backgroundColor,
         body: Center(
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              final scale = _entranceScale.value * _pulseScale.value;
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Opacity(
                     opacity: _iconOpacity.value,
                     child: Transform.scale(
-                      scale: scale,
+                      scale: _scaleAnimation.value,
                       child: Image.asset(
                         _iconAssetPath,
-                        width: 120,
-                        height: 120,
+                        width: 110,
+                        height: 110,
                         semanticLabel: 'Academic Assistant App Logo',
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   SlideTransition(
                     position: _wordmarkOffset,
                     child: Opacity(
@@ -177,9 +155,9 @@ class _SplashScreenState extends State<SplashScreen>
                         'sentry',
                         style: GoogleFonts.spaceGrotesk(
                           fontSize: 32,
-                          fontWeight: FontWeight.w500,
-                          color: _green,
-                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                          letterSpacing: -0.5,
                         ),
                       ),
                     ),
