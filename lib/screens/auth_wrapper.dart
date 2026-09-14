@@ -16,7 +16,7 @@ class AuthWrapper extends StatelessWidget {
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SplashScreen();
+          return const SplashScreen(autoNavigate: false);
         }
 
         final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
