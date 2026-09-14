@@ -39,42 +39,38 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 750),
     );
 
-    // Immediate spring pop animation (0.0s - 1.2s)
-    _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 0.85, end: 1.08).chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 60,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.08, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 40,
-      ),
-    ]).animate(_controller);
-
-    _iconOpacity = Tween(begin: 0.4, end: 1.0).animate(
+    // Fast spring entrance
+    _scaleAnimation = Tween(begin: 0.75, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.35, curve: Curves.easeIn),
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    _iconOpacity = Tween(begin: 0.2, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
       ),
     );
 
     _wordmarkOpacity = Tween(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
+        curve: const Interval(0.15, 0.7, curve: Curves.easeOut),
       ),
     );
 
     _wordmarkOffset = Tween(
-      begin: const Offset(0, 0.25),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.2, 0.7, curve: Curves.easeOutCubic),
+        curve: const Interval(0.15, 0.7, curve: Curves.easeOutCubic),
       ),
     );
 
