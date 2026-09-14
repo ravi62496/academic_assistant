@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/cookies_policy_screen.dart';
 import '../screens/privacy_policy_screen.dart';
@@ -18,12 +19,50 @@ class CookieConsentBanner extends StatefulWidget {
 }
 
 class _CookieConsentBannerState extends State<CookieConsentBanner> {
-  static bool _hasRespondedInSession = false;
+  static const String _consentKey = 'cookie_consent_accepted';
+  bool _hasResponded = true; // Default to true (hidden) until prefs check completes
 
-  void _respond(bool acceptOptional) {
+  @override
+  void initState() {
+    super.initState();
+    _checkConsent();
+  }
+
+  Future<void> _checkConsent() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final responded = prefs.getBool(_consentKey);
+      if (responded == null) {
+        if (mounted) {
+          setState(() {
+            _hasResponded = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _hasResponded = true;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _hasResponded = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _respond(bool acceptOptional) async {
     setState(() {
-      _hasRespondedInSession = true;
+      _hasResponded = true;
     });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_consentKey, acceptOptional);
+    } catch (_) {}
   }
 
   @override
@@ -33,7 +72,7 @@ class _CookieConsentBannerState extends State<CookieConsentBanner> {
     return Stack(
       children: [
         widget.child,
-        if (!_hasRespondedInSession)
+        if (!_hasResponded)
           Positioned(
             left: 16,
             right: 16,
