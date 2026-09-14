@@ -206,6 +206,7 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: courses.any((c) => c.id == _selectedCourseId)
                         ? _selectedCourseId
                         : courses.first.id,
@@ -220,6 +221,7 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                               ? '${course.name} (${course.code})'
                               : course.name,
                           style: GoogleFonts.plusJakartaSans(fontSize: 14.5),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       );
                     }).toList(),
@@ -262,14 +264,17 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                                 ),
                               ),
                               child: Center(
-                                child: Text(
-                                  _daysShort[i],
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _daysShort[i],
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                                    ),
                                   ),
                                 ),
                               ),

@@ -65,7 +65,9 @@ class PasswordStrengthIndicator extends StatelessWidget {
             'Include uppercase, numbers, and symbols for a stronger password',
             style: TextStyle(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
             ),
           ),
         ],

@@ -129,7 +129,7 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
         hintStyle: GoogleFonts.plusJakartaSans(
-          color: AppColors.lightTextSecondary.withValues(alpha: 0.7),
+          color: AppColors.lightTextSecondary,
           fontSize: 14,
         ),
         labelStyle: GoogleFonts.plusJakartaSans(color: AppColors.lightTextSecondary, fontSize: 14),
@@ -305,7 +305,7 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
         hintStyle: GoogleFonts.plusJakartaSans(
-          color: AppColors.darkTextSecondary.withValues(alpha: 0.7),
+          color: AppColors.darkTextSecondary,
           fontSize: 14,
         ),
         labelStyle: GoogleFonts.plusJakartaSans(color: AppColors.darkTextSecondary, fontSize: 14),
@@ -313,7 +313,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.darkBackground,
+          foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(50),
           elevation: 0,
           shape: RoundedRectangleBorder(

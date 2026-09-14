@@ -120,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen>
             Navigator.of(context).pushReplacement(
               PageRouteBuilder(
                 transitionDuration: const Duration(milliseconds: 400),
-                pageBuilder: (_, animation, __) => FadeTransition(
+                pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
                   opacity: animation,
                   child: targetScreen,
                 ),
@@ -164,6 +164,7 @@ class _SplashScreenState extends State<SplashScreen>
                         _iconAssetPath,
                         width: 120,
                         height: 120,
+                        semanticLabel: 'Academic Assistant App Logo',
                       ),
                     ),
                   ),

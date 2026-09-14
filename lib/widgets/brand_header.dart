@@ -36,6 +36,7 @@ class BrandHeader extends StatelessWidget {
                 width: 32,
                 height: 32,
                 fit: BoxFit.contain,
+                semanticLabel: 'Academic Assistant Brand Logo',
               ),
             ),
             const SizedBox(width: 14),

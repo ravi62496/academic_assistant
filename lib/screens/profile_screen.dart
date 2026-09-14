@@ -9,7 +9,10 @@ import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/ai_node_icon.dart';
+import 'cookies_policy_screen.dart';
 import 'login_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_conditions_screen.dart';
 
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -134,6 +137,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         labelText: 'New Password',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
+                          tooltip: obscure ? 'Show password' : 'Hide password',
                           icon: Icon(obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                           onPressed: () => setModalState(() => obscure = !obscure),
                         ),
@@ -525,6 +529,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onTap: () {
                 ref.read(activeTabProvider.notifier).selectTab(3); // Courses tab
                 Navigator.of(context).pop();
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // Legal & Compliance Section
+            Text(
+              'Legal & Compliance',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            _buildTile(
+              context: context,
+              icon: Icons.privacy_tip_outlined,
+              iconColor: AppColors.primary,
+              title: 'Privacy Policy',
+              subtitle: 'How we collect, use, and protect your data',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildTile(
+              context: context,
+              icon: Icons.description_outlined,
+              iconColor: AppColors.secondary,
+              title: 'Terms & Conditions',
+              subtitle: 'User agreement, AI usage, and policies',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildTile(
+              context: context,
+              icon: Icons.cookie_outlined,
+              iconColor: AppColors.aiAccent,
+              title: 'Cookies & Storage Policy',
+              subtitle: 'Session tokens and local preferences',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CookiesPolicyScreen()),
+                );
               },
             ),
 

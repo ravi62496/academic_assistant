@@ -530,6 +530,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Remove image',
                     icon: const Icon(Icons.close_rounded, size: 20),
                     onPressed: _clearSelectedImage,
                   ),
@@ -1341,6 +1342,7 @@ class _EditImportEntriesDialogState extends State<_EditImportEntriesDialog> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Remove entry',
                         icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
                         onPressed: () {
                           setState(() {

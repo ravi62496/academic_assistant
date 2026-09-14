@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/validators.dart';
@@ -96,6 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       hint: 'student@university.edu',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       validator: Validators.validateEmail,
                       enabled: !_isLoading,
                     ),
@@ -106,9 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       hint: '••••••••',
                       prefixIcon: Icons.lock_outline,
                       obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleLogin(),
                       validator: Validators.validatePassword,
                       enabled: !_isLoading,
                       suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                         icon: Icon(
                           _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           size: 20,
@@ -155,7 +160,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                         ),

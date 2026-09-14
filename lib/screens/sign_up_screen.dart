@@ -115,6 +115,7 @@ class _LegacySignUpScreenState extends State<LegacySignUpScreen> {
                 decoration: InputDecoration(
                   labelText: 'Password (min 6 chars)',
                   suffixIcon: IconButton(
+                    tooltip: _obscure ? 'Show password' : 'Hide password',
                     icon: Icon(
                       _obscure ? Icons.visibility_off : Icons.visibility,
                     ),

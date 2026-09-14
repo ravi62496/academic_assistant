@@ -375,6 +375,7 @@ class CoursesScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'courses_fab',
         backgroundColor: AppColors.primary,
         onPressed: () => _showCourseDialog(context, ref),
         icon: const Icon(Icons.add, color: Colors.white),

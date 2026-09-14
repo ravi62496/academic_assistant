@@ -85,6 +85,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       hint: 'name@university.edu',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleReset(),
                       validator: Validators.validateEmail,
                     ),
                     const SizedBox(height: 24),

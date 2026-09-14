@@ -144,12 +144,15 @@ class _WeeklyTimetableScreenState extends ConsumerState<WeeklyTimetableScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  DateFormat('EEEE, MMMM d').format(_selectedDate),
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.3,
+                Expanded(
+                  child: Text(
+                    DateFormat('EEEE, MMMM d').format(_selectedDate),
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 TextButton.icon(
@@ -354,6 +357,7 @@ class _WeeklyTimetableScreenState extends ConsumerState<WeeklyTimetableScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'timetable_fab',
         backgroundColor: AppColors.primary,
         onPressed: () {
           Navigator.of(context).push(

@@ -50,6 +50,7 @@ class _AiNodeIconState extends State<AiNodeIcon> with SingleTickerProviderStateM
         Icons.hub_outlined,
         size: widget.size,
         color: iconColor,
+        semanticLabel: 'AI Assistant Node',
       );
     }
 
@@ -67,6 +68,7 @@ class _AiNodeIconState extends State<AiNodeIcon> with SingleTickerProviderStateM
               Icons.hub_outlined,
               size: widget.size,
               color: iconColor,
+              semanticLabel: 'AI Assistant Node',
             ),
           ),
         );

@@ -234,6 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close task dialog',
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(ctx).pop(),
                       ),
@@ -481,40 +482,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Text(
-                  'Tasks & Deadlines',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.3,
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Tasks & Deadlines',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                tasksAsync.maybeWhen(
-                  data: (tasks) {
-                    final pendingCount = tasks.where((t) => !t.isCompleted).length;
-                    if (pendingCount == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$pendingCount',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.warning,
+                  const SizedBox(width: 8),
+                  tasksAsync.maybeWhen(
+                    data: (tasks) {
+                      final pendingCount = tasks.where((t) => !t.isCompleted).length;
+                      if (pendingCount == 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    );
-                  },
-                  orElse: () => const SizedBox.shrink(),
-                ),
-              ],
+                        child: Text(
+                          '$pendingCount',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
             ),
             TextButton.icon(
               onPressed: () => _showAddTaskDialog(context),
@@ -553,6 +559,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               width: 28,
               height: 28,
               fit: BoxFit.contain,
+              semanticLabel: 'Academic Assistant Logo',
             ),
             const SizedBox(width: 10),
             Text(
@@ -1106,12 +1113,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     ],
                   ),
                 ),
-                Text(
-                  '$formattedStart - $formattedEnd',
-                  style: AppTheme.monoTimeStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                Flexible(
+                  child: Text(
+                    '$formattedStart - $formattedEnd',
+                    style: AppTheme.monoTimeStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1296,7 +1306,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                               color: inProgress
                                   ? AppColors.primary
                                   : (isCompleted
-                                      ? AppColors.textSecondary.withValues(alpha: 0.6)
+                                      ? (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)
                                       : (isDark
                                           ? AppColors.darkTextPrimary
                                           : AppColors.lightTextPrimary)),
@@ -1306,7 +1316,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                             endFormatted,
                             style: AppTheme.monoTimeStyle(
                               fontSize: 10,
-                              color: AppColors.textSecondary.withValues(alpha: 0.6),
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             ),
                           ),
                         ],
@@ -1604,6 +1614,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               ],
             ),
             trailing: IconButton(
+              tooltip: 'Delete task',
               icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textSecondary),
               onPressed: () async {
                 await ref.read(tasksProvider.notifier).deleteTask(task.id);

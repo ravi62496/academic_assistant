@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/navigation_providers.dart';
 import '../theme/app_colors.dart';
 import '../widgets/ai_node_icon.dart';
+import '../widgets/cookie_consent_banner.dart';
 import 'ai_assistant_screen.dart';
 import 'courses_screen.dart';
 import 'home_screen.dart';
@@ -23,11 +24,12 @@ class MainShell extends ConsumerWidget {
     final activeIndex = ref.watch(activeTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: activeIndex,
-        children: _screens,
-      ),
+    return CookieConsentBanner(
+      child: Scaffold(
+        body: IndexedStack(
+          index: activeIndex,
+          children: _screens,
+        ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
@@ -80,6 +82,7 @@ class MainShell extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

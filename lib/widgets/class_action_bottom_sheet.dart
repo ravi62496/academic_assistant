@@ -313,35 +313,39 @@ class ClassActionBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade500,
-              borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade500,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            classSchedule.course?.name ?? 'Class Options',
-            style: GoogleFonts.spaceGrotesk(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            const SizedBox(height: 18),
+            Text(
+              classSchedule.course?.name ?? 'Class Options',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${classSchedule.startTime} - ${classSchedule.endTime}${classSchedule.room != null ? ' • ${classSchedule.room}' : ''}',
-            style: AppTheme.monoTimeStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              '${classSchedule.startTime} - ${classSchedule.endTime}${classSchedule.room != null && classSchedule.room!.isNotEmpty ? ' • ${classSchedule.room}' : ''}',
+              style: AppTheme.monoTimeStyle(color: AppColors.textSecondary, fontSize: 13),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           const SizedBox(height: 20),
           ListTile(
             leading: const Icon(Icons.edit_calendar_outlined, color: AppColors.primary),
@@ -380,6 +384,7 @@ class ClassActionBottomSheet extends ConsumerWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

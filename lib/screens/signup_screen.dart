@@ -1,5 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../theme/app_colors.dart';
 import '../utils/constants.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/validators.dart';
@@ -9,6 +11,8 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/password_strength_indicator.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_conditions_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -28,6 +32,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _agreedToTerms = false;
   String _passwordText = '';
 
   @override
@@ -41,6 +46,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_agreedToTerms) {
+      SnackbarUtils.showError(
+        context,
+        'Please review and accept the Privacy Policy and Terms & Conditions.',
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -129,6 +141,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       hint: 'Alex Morgan',
                       prefixIcon: Icons.person_outline,
                       textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
                       validator: Validators.validateName,
                       enabled: !_isLoading,
                     ),
@@ -139,6 +152,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       hint: 'student@university.edu',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       validator: Validators.validateEmail,
                       enabled: !_isLoading,
                     ),
@@ -149,12 +163,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       hint: 'Min. 6 characters',
                       prefixIcon: Icons.lock_outline,
                       obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.next,
                       validator: Validators.validatePassword,
                       enabled: !_isLoading,
                       onChanged: (val) {
                         setState(() => _passwordText = val);
                       },
                       suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                         icon: Icon(
                           _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           size: 20,
@@ -172,9 +188,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       hint: 'Re-enter your password',
                       prefixIcon: Icons.lock_clock_outlined,
                       obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleSignUp(),
                       validator: (val) => Validators.validateConfirmPassword(val, _passwordController.text),
                       enabled: !_isLoading,
                       suffixIcon: IconButton(
+                        tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
                         icon: Icon(
                           _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                           size: 20,
@@ -184,7 +203,96 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 16),
+                    FormField<bool>(
+                      initialValue: _agreedToTerms,
+                      validator: (val) {
+                        if (!_agreedToTerms) {
+                          return 'Acceptance of terms is required';
+                        }
+                        return null;
+                      },
+                      builder: (fieldState) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Checkbox(
+                                  value: _agreedToTerms,
+                                  onChanged: _isLoading
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            _agreedToTerms = val ?? false;
+                                            fieldState.didChange(_agreedToTerms);
+                                          });
+                                        },
+                                  activeColor: AppColors.primary,
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: RichText(
+                                      text: TextSpan(
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                        ),
+                                        children: [
+                                          const TextSpan(text: 'I agree to the '),
+                                          TextSpan(
+                                            text: 'Terms & Conditions',
+                                            style: const TextStyle(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.bold,
+                                              decoration: TextDecoration.underline,
+                                            ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                                                );
+                                              },
+                                          ),
+                                          const TextSpan(text: ' and '),
+                                          TextSpan(
+                                            text: 'Privacy Policy',
+                                            style: const TextStyle(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.bold,
+                                              decoration: TextDecoration.underline,
+                                            ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                                                );
+                                              },
+                                          ),
+                                          const TextSpan(text: '.'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (fieldState.hasError)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12, top: 2),
+                                child: Text(
+                                  fieldState.errorText!,
+                                  style: const TextStyle(color: AppColors.error, fontSize: 12),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
                     CustomButton(
                       text: 'Create Account',
                       onPressed: _handleSignUp,
