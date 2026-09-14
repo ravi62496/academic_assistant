@@ -54,6 +54,7 @@ class ClassSchedule {
       'end_time': endTime,
       if (room != null) 'room': room,
       if (createdAt != null) 'created_at': createdAt?.toIso8601String(),
+      if (course != null) 'courses': course?.toJson(),
     };
   }
 

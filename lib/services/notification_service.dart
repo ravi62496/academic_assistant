@@ -115,6 +115,9 @@ class NotificationService {
   Future<void> scheduleClassReminders(List<ClassSchedule> classes) async {
     if (!_isInitialized) await initialize();
 
+    const scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+    final now = tz.TZDateTime.now(tz.local);
+
     for (final cs in classes) {
       final timeParts = parseTimeString(cs.startTime);
       final classHour = timeParts[0];
@@ -134,7 +137,6 @@ class NotificationService {
         dayOffset = -1;
       }
 
-      final now = tz.TZDateTime.now(tz.local);
       // Find upcoming target day of week
       int targetDayOfWeek = cs.dayOfWeek + dayOffset;
       if (targetDayOfWeek < 1) targetDayOfWeek += 7;
@@ -152,9 +154,18 @@ class NotificationService {
         alertMin,
       ).add(Duration(days: daysUntilClass));
 
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 7));
-      }
+      // Calculate actual class start date/time
+      int daysUntilActualClass = cs.dayOfWeek - now.weekday;
+      if (daysUntilActualClass < 0) daysUntilActualClass += 7;
+
+      final classStartDate = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        classHour,
+        classMin,
+      ).add(Duration(days: daysUntilActualClass));
 
       final courseName = cs.course?.name ?? cs.course?.code ?? 'Upcoming Class';
       final roomInfo = (cs.room != null && cs.room!.trim().isNotEmpty)
@@ -162,6 +173,43 @@ class NotificationService {
           : '';
 
       final notificationId = (cs.id.hashCode.abs() % 900000) + 2000;
+
+      // If the 10-minute alert time has passed, but class starts within next 10 minutes today
+      if (scheduledDate.isBefore(now)) {
+        if (classStartDate.isAfter(now)) {
+          // Send immediate alert for today's class starting shortly
+          try {
+            await _notificationsPlugin.zonedSchedule(
+              notificationId + 100000,
+              'Class Starting Soon: $courseName',
+              'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+              now.add(const Duration(seconds: 3)),
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  classChannelId,
+                  classChannelName,
+                  channelDescription: classChannelDescription,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  icon: '@mipmap/ic_launcher',
+                ),
+                iOS: DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentBadge: true,
+                  presentSound: true,
+                ),
+              ),
+              androidScheduleMode: scheduleMode,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+            );
+          } catch (e) {
+            debugPrint('Error scheduling immediate reminder for ${cs.id}: $e');
+          }
+        }
+        // Advance recurring weekly schedule to next week
+        scheduledDate = scheduledDate.add(const Duration(days: 7));
+      }
 
       try {
         await _notificationsPlugin.zonedSchedule(
@@ -184,13 +232,43 @@ class NotificationService {
               presentSound: true,
             ),
           ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          androidScheduleMode: scheduleMode,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         );
       } catch (e) {
         debugPrint('Error scheduling class reminder for ${cs.id}: $e');
+        // Fallback to inexact schedule if exact scheduling fails
+        try {
+          await _notificationsPlugin.zonedSchedule(
+            notificationId,
+            'Class Starting Soon: $courseName',
+            'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+            scheduledDate,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                classChannelId,
+                classChannelName,
+                channelDescription: classChannelDescription,
+                importance: Importance.max,
+                priority: Priority.high,
+                icon: '@mipmap/ic_launcher',
+              ),
+              iOS: DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+        } catch (err) {
+          debugPrint('Fallback class reminder schedule failed for ${cs.id}: $err');
+        }
       }
     }
   }
@@ -228,7 +306,32 @@ class NotificationService {
         matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
-      debugPrint('Error scheduling morning briefing: $e');
+      debugPrint('Error scheduling morning briefing with exact mode: $e');
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          morningBriefingNotificationId,
+          '🌅 Good Morning! Today\'s Schedule',
+          body,
+          scheduledDate,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              dailyChannelId,
+              dailyChannelName,
+              channelDescription: dailyChannelDescription,
+              importance: Importance.defaultImportance,
+              priority: Priority.defaultPriority,
+              icon: '@mipmap/ic_launcher',
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      } catch (err) {
+        debugPrint('Fallback scheduling morning briefing failed: $err');
+      }
     }
   }
 
@@ -265,7 +368,32 @@ class NotificationService {
         matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
-      debugPrint('Error scheduling nightly preview: $e');
+      debugPrint('Error scheduling nightly preview with exact mode: $e');
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          nightlyPreviewNotificationId,
+          '🌙 Tomorrow\'s Schedule Preview',
+          body,
+          scheduledDate,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              dailyChannelId,
+              dailyChannelName,
+              channelDescription: dailyChannelDescription,
+              importance: Importance.defaultImportance,
+              priority: Priority.defaultPriority,
+              icon: '@mipmap/ic_launcher',
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      } catch (err) {
+        debugPrint('Fallback scheduling nightly preview failed: $err');
+      }
     }
   }
 

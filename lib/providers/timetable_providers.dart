@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/class_schedule.dart';
+import '../services/cache_service.dart';
 import '../services/timetable_service.dart';
 
 final timetableServiceProvider = Provider<TimetableService>((ref) {
@@ -7,10 +8,32 @@ final timetableServiceProvider = Provider<TimetableService>((ref) {
 });
 
 class TimetableNotifier extends AsyncNotifier<List<ClassSchedule>> {
+  static const _cacheKey = 'cached_classes';
+  final _cacheService = CacheService();
+
   @override
   Future<List<ClassSchedule>> build() async {
     final service = ref.watch(timetableServiceProvider);
-    return service.getClasses();
+
+    // 1. Instantly load cached class schedules if available
+    final cached = await _cacheService.getList<ClassSchedule>(_cacheKey, ClassSchedule.fromJson);
+    if (cached != null && cached.isNotEmpty) {
+      state = AsyncValue.data(cached);
+    }
+
+    // 2. Fetch fresh class schedules from network and update cache
+    try {
+      final fresh = await service.getClasses();
+      await _cacheService.saveList(_cacheKey, fresh, (cs) => cs.toJson());
+      state = AsyncValue.data(fresh);
+      return fresh;
+    } catch (e) {
+      if (cached != null) {
+        state = AsyncValue.data(cached);
+        return cached;
+      }
+      rethrow;
+    }
   }
 
   Future<ClassSchedule> addClass({
@@ -80,8 +103,25 @@ final timetableProvider = AsyncNotifierProvider<TimetableNotifier, List<ClassSch
 final scheduleForDateProvider = FutureProvider.family<List<ClassSchedule>, DateTime>((ref, date) async {
   // Normalize date to date-only (midnight) so time component changes don't affect provider key
   final normalizedDate = DateTime(date.year, date.month, date.day);
+
   // Watch timetableProvider so this recalculates whenever schedules or overrides change
   ref.watch(timetableProvider);
+
+  final cacheService = CacheService();
+  final cacheKey = 'cached_schedule_${normalizedDate.year}_${normalizedDate.month}_${normalizedDate.day}';
+
+  final cached = await cacheService.getList<ClassSchedule>(cacheKey, ClassSchedule.fromJson);
+
   final service = ref.watch(timetableServiceProvider);
-  return service.getScheduleForDate(normalizedDate);
+
+  try {
+    final fresh = await service.getScheduleForDate(normalizedDate);
+    await cacheService.saveList(cacheKey, fresh, (cs) => cs.toJson());
+    return fresh;
+  } catch (e) {
+    if (cached != null) {
+      return cached;
+    }
+    rethrow;
+  }
 });

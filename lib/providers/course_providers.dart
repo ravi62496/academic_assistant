@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/course.dart';
+import '../services/cache_service.dart';
 import '../services/course_service.dart';
 
 final courseServiceProvider = Provider<CourseService>((ref) {
@@ -7,10 +8,32 @@ final courseServiceProvider = Provider<CourseService>((ref) {
 });
 
 class CourseNotifier extends AsyncNotifier<List<Course>> {
+  static const _cacheKey = 'cached_courses';
+  final _cacheService = CacheService();
+
   @override
   Future<List<Course>> build() async {
     final service = ref.watch(courseServiceProvider);
-    return service.getCourses();
+
+    // 1. Instantly load cached courses if available
+    final cached = await _cacheService.getList<Course>(_cacheKey, Course.fromJson);
+    if (cached != null && cached.isNotEmpty) {
+      state = AsyncValue.data(cached);
+    }
+
+    // 2. Fetch fresh data from network and update cache
+    try {
+      final fresh = await service.getCourses();
+      await _cacheService.saveList(_cacheKey, fresh, (c) => c.toJson());
+      state = AsyncValue.data(fresh);
+      return fresh;
+    } catch (e) {
+      if (cached != null) {
+        state = AsyncValue.data(cached);
+        return cached;
+      }
+      rethrow;
+    }
   }
 
   Future<Course> addCourse({
@@ -24,7 +47,6 @@ class CourseNotifier extends AsyncNotifier<List<Course>> {
       name: name,
       code: code,
       professor: professor,
-
     );
     ref.invalidateSelf();
     return newCourse;

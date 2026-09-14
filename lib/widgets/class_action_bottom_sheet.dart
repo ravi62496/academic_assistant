@@ -29,16 +29,16 @@ class ClassActionBottomSheet extends ConsumerWidget {
     'Sunday',
   ];
 
-  void _showRescheduleDialog(BuildContext context, WidgetRef ref) {
+  void _showRescheduleDialog(BuildContext bottomSheetContext, WidgetRef ref) {
     TimeOfDay startTime = _parseTime(classSchedule.startTime);
     TimeOfDay endTime = _parseTime(classSchedule.endTime);
     final roomController = TextEditingController(text: classSchedule.room ?? '');
     String rescheduleScope = 'this_occurrence';
 
     showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) {
+      context: bottomSheetContext,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setState) {
           return AlertDialog(
             title: Text(
               'Reschedule Class',
@@ -88,11 +88,11 @@ class ClassActionBottomSheet extends ConsumerWidget {
                             const SizedBox(height: 6),
                             OutlinedButton(
                               onPressed: () async {
-                                final picked = await showTimePicker(context: ctx, initialTime: startTime);
+                                final picked = await showTimePicker(context: dialogCtx, initialTime: startTime);
                                 if (picked != null) setState(() => startTime = picked);
                               },
                               child: Text(
-                                startTime.format(ctx),
+                                startTime.format(dialogCtx),
                                 style: AppTheme.monoTimeStyle(fontSize: 14),
                               ),
                             ),
@@ -111,11 +111,11 @@ class ClassActionBottomSheet extends ConsumerWidget {
                             const SizedBox(height: 6),
                             OutlinedButton(
                               onPressed: () async {
-                                final picked = await showTimePicker(context: ctx, initialTime: endTime);
+                                final picked = await showTimePicker(context: dialogCtx, initialTime: endTime);
                                 if (picked != null) setState(() => endTime = picked);
                               },
                               child: Text(
-                                endTime.format(ctx),
+                                endTime.format(dialogCtx),
                                 style: AppTheme.monoTimeStyle(fontSize: 14),
                               ),
                             ),
@@ -137,7 +137,7 @@ class ClassActionBottomSheet extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
+                onPressed: () => Navigator.of(dialogCtx).pop(),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
@@ -159,9 +159,9 @@ class ClassActionBottomSheet extends ConsumerWidget {
                         newEndTime: formattedEnd,
                         newRoom: roomController.text.trim(),
                       );
-                      if (ctx.mounted) {
+                      if (bottomSheetContext.mounted) {
                         SnackbarUtils.showSuccess(
-                            ctx, 'Rescheduled for ${DateFormat('MMM d').format(targetDate)}');
+                            bottomSheetContext, 'Rescheduled for ${DateFormat('MMM d').format(targetDate)}');
                       }
                     } else {
                       await notifier.updateClass(classSchedule.copyWith(
@@ -169,13 +169,14 @@ class ClassActionBottomSheet extends ConsumerWidget {
                         endTime: formattedEnd,
                         room: roomController.text.trim(),
                       ));
-                      if (ctx.mounted) SnackbarUtils.showSuccess(ctx, 'Updated recurring schedule');
+                      if (bottomSheetContext.mounted) {
+                        SnackbarUtils.showSuccess(bottomSheetContext, 'Updated recurring schedule');
+                      }
                     }
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                    }
+                    if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+                    if (bottomSheetContext.mounted) Navigator.of(bottomSheetContext).pop();
                   } catch (e) {
-                    if (ctx.mounted) SnackbarUtils.showError(ctx, e.toString());
+                    if (dialogCtx.mounted) SnackbarUtils.showError(dialogCtx, e.toString());
                   }
                 },
                 child: const Text('Confirm'),
@@ -187,13 +188,13 @@ class ClassActionBottomSheet extends ConsumerWidget {
     );
   }
 
-  void _showCancelDialog(BuildContext context, WidgetRef ref) {
+  void _showCancelDialog(BuildContext bottomSheetContext, WidgetRef ref) {
     String cancelScope = 'this_occurrence';
 
     showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) {
+      context: bottomSheetContext,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setState) {
           return AlertDialog(
             title: Text(
               'Cancel / Delete Class',
@@ -223,7 +224,7 @@ class ClassActionBottomSheet extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
+                onPressed: () => Navigator.of(dialogCtx).pop(),
                 child: const Text('Back'),
               ),
               ElevatedButton(
@@ -238,19 +239,20 @@ class ClassActionBottomSheet extends ConsumerWidget {
                         overrideDate: dateStr,
                         type: 'cancelled',
                       );
-                      if (ctx.mounted) {
+                      if (bottomSheetContext.mounted) {
                         SnackbarUtils.showInfo(
-                            ctx, 'Class cancelled for ${DateFormat('MMM d').format(targetDate)}');
+                            bottomSheetContext, 'Class cancelled for ${DateFormat('MMM d').format(targetDate)}');
                       }
                     } else {
                       await notifier.deleteClass(classSchedule.id);
-                      if (ctx.mounted) {
-                        SnackbarUtils.showInfo(ctx, 'Recurring class schedule deleted');
+                      if (bottomSheetContext.mounted) {
+                        SnackbarUtils.showInfo(bottomSheetContext, 'Recurring class schedule deleted');
                       }
                     }
-                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+                    if (bottomSheetContext.mounted) Navigator.of(bottomSheetContext).pop();
                   } catch (e) {
-                    if (ctx.mounted) SnackbarUtils.showError(ctx, e.toString());
+                    if (dialogCtx.mounted) SnackbarUtils.showError(dialogCtx, e.toString());
                   }
                 },
                 child: const Text('Confirm'),
@@ -353,7 +355,6 @@ class ClassActionBottomSheet extends ConsumerWidget {
             subtitle: Text('Change time, date, or room for single or recurring class',
                 style: GoogleFonts.plusJakartaSans(fontSize: 12)),
             onTap: () {
-              Navigator.of(context).pop();
               _showRescheduleDialog(context, ref);
             },
           ),
@@ -378,7 +379,6 @@ class ClassActionBottomSheet extends ConsumerWidget {
             subtitle: Text('Cancel this occurrence or delete recurring schedule',
                 style: GoogleFonts.plusJakartaSans(fontSize: 12)),
             onTap: () {
-              Navigator.of(context).pop();
               _showCancelDialog(context, ref);
             },
           ),

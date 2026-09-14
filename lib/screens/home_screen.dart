@@ -200,6 +200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     DateTime? selectedDueDate;
     TimeOfDay? selectedDueTime;
     String? selectedCourseId;
+    bool isSaving = false;
 
     final coursesAsync = ref.read(coursesProvider);
 
@@ -336,45 +337,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () async {
-                        final title = titleController.text.trim();
-                        if (title.isEmpty) {
-                          SnackbarUtils.showError(ctx, 'Please enter a task title');
-                          return;
-                        }
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              final title = titleController.text.trim();
+                              if (title.isEmpty) {
+                                SnackbarUtils.showError(ctx, 'Please enter a task title');
+                                return;
+                              }
 
-                        DateTime? finalDueDate;
-                        if (selectedDueDate != null) {
-                          final time = selectedDueTime ?? const TimeOfDay(hour: 23, minute: 59);
-                          finalDueDate = DateTime(
-                            selectedDueDate!.year,
-                            selectedDueDate!.month,
-                            selectedDueDate!.day,
-                            time.hour,
-                            time.minute,
-                          );
-                        }
+                              DateTime? finalDueDate;
+                              if (selectedDueDate != null) {
+                                final time = selectedDueTime ?? const TimeOfDay(hour: 23, minute: 59);
+                                finalDueDate = DateTime(
+                                  selectedDueDate!.year,
+                                  selectedDueDate!.month,
+                                  selectedDueDate!.day,
+                                  time.hour,
+                                  time.minute,
+                                );
+                              }
 
-                        try {
-                          await ref.read(tasksProvider.notifier).addTask(
-                            title: title,
-                            description: descController.text.trim().isEmpty
-                                ? null
-                                : descController.text.trim(),
-                            courseId: selectedCourseId,
-                            dueDate: finalDueDate,
-                          );
-                          if (ctx.mounted) {
-                            Navigator.of(ctx).pop();
-                            SnackbarUtils.showSuccess(context, 'Task added successfully');
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            SnackbarUtils.showError(ctx, 'Failed to add task: $e');
-                          }
-                        }
-                      },
-                      child: const Text('Save Task'),
+                              setModalState(() => isSaving = true);
+
+                              try {
+                                await ref.read(tasksProvider.notifier).addTask(
+                                  title: title,
+                                  description: descController.text.trim().isEmpty
+                                      ? null
+                                      : descController.text.trim(),
+                                  courseId: selectedCourseId,
+                                  dueDate: finalDueDate,
+                                );
+                                if (ctx.mounted) {
+                                  Navigator.of(ctx).pop();
+                                  SnackbarUtils.showSuccess(context, 'Task added successfully');
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) {
+                                  SnackbarUtils.showError(ctx, 'Failed to add task: $e');
+                                }
+                              } finally {
+                                if (ctx.mounted) {
+                                  setModalState(() => isSaving = false);
+                                }
+                              }
+                            },
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Save Task'),
                     ),
                   ),
                 ],

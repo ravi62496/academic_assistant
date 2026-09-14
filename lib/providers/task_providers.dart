@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
+import '../services/cache_service.dart';
 import '../services/task_service.dart';
 
 final taskServiceProvider = Provider<TaskService>((ref) {
@@ -7,10 +8,32 @@ final taskServiceProvider = Provider<TaskService>((ref) {
 });
 
 class TaskNotifier extends AsyncNotifier<List<Task>> {
+  static const _cacheKey = 'cached_tasks';
+  final _cacheService = CacheService();
+
   @override
   Future<List<Task>> build() async {
     final service = ref.watch(taskServiceProvider);
-    return service.getTasks();
+
+    // 1. Instantly load cached tasks if available
+    final cached = await _cacheService.getList<Task>(_cacheKey, Task.fromJson);
+    if (cached != null && cached.isNotEmpty) {
+      state = AsyncValue.data(cached);
+    }
+
+    // 2. Fetch fresh tasks from network and update cache
+    try {
+      final fresh = await service.getTasks();
+      await _cacheService.saveList(_cacheKey, fresh, (t) => t.toJson());
+      state = AsyncValue.data(fresh);
+      return fresh;
+    } catch (e) {
+      if (cached != null) {
+        state = AsyncValue.data(cached);
+        return cached;
+      }
+      rethrow;
+    }
   }
 
   Future<Task> addTask({

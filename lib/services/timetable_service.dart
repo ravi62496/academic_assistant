@@ -163,11 +163,14 @@ class TimetableService {
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final dayOfWeek = date.weekday; // 1 = Monday, 7 = Sunday
 
-    // 1. Fetch recurring classes for this weekday
-    final recurringClasses = await getClassesForDay(dayOfWeek);
+    // 1 & 2. Fetch recurring classes for this weekday AND overrides concurrently
+    final results = await Future.wait([
+      getClassesForDay(dayOfWeek),
+      getOverridesForDate(dateStr),
+    ]);
 
-    // 2. Fetch overrides for dateStr
-    final overrides = await getOverridesForDate(dateStr);
+    final recurringClasses = results[0] as List<ClassSchedule>;
+    final overrides = results[1] as List<ScheduleOverride>;
     final overrideMap = {for (var o in overrides) o.classScheduleId: o};
 
     final List<ClassSchedule> effectiveClasses = [];
@@ -192,11 +195,15 @@ class TimetableService {
     }
 
     // 3. Handle overrides that rescheduled classes from another day TO this date
-    final otherOverrides = overrides.where((o) => !recurringClasses.any((cs) => cs.id == o.classScheduleId));
-    for (final o in otherOverrides) {
-      if (o.type == 'rescheduled') {
-        final baseCs = await getClassById(o.classScheduleId);
-        if (baseCs != null) {
+    final otherOverrides = overrides.where((o) => !recurringClasses.any((cs) => cs.id == o.classScheduleId)).toList();
+    if (otherOverrides.isNotEmpty) {
+      final baseClasses = await Future.wait(
+        otherOverrides.map((o) => getClassById(o.classScheduleId)),
+      );
+      for (int i = 0; i < otherOverrides.length; i++) {
+        final o = otherOverrides[i];
+        final baseCs = baseClasses[i];
+        if (o.type == 'rescheduled' && baseCs != null) {
           effectiveClasses.add(baseCs.copyWith(
             startTime: o.newStartTime ?? baseCs.startTime,
             endTime: o.newEndTime ?? baseCs.endTime,

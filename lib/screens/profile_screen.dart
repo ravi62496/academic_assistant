@@ -5,7 +5,6 @@ import '../providers/navigation_providers.dart';
 import '../providers/notification_providers.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
-import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/ai_node_icon.dart';
@@ -465,22 +464,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ref.read(notificationSettingsProvider.notifier).toggleNightlyPreview(val);
               },
             ),
-            const SizedBox(height: 8),
-
-            _buildTile(
-              context: context,
-              icon: Icons.notifications_active_outlined,
-              iconColor: AppColors.secondary,
-              title: 'Test Notification System',
-              subtitle: 'Send an immediate test notification now',
-              onTap: () async {
-                await NotificationService().sendTestNotification();
-                if (context.mounted) {
-                  SnackbarUtils.showSuccess(context, 'Test notification sent!');
-                }
-              },
-            ),
-
 
             const SizedBox(height: 24),
 

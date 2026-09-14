@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'cache_service.dart';
 
 class AuthService {
   final SupabaseClient _client;
@@ -26,7 +28,8 @@ class AuthService {
     final user = currentUser;
     if (user == null) return 'Student';
 
-    final metaName = user.userMetadata?['full_name'] as String?;
+    final meta = user.userMetadata;
+    final metaName = (meta?['full_name'] ?? meta?['fullName'] ?? meta?['name']) as String?;
     if (metaName != null && metaName.trim().isNotEmpty) {
       return metaName.trim();
     }
@@ -133,12 +136,16 @@ class AuthService {
 
       final userId = currentUser?.id;
       if (userId != null) {
-        await _client.from('profiles').upsert({
-          'id': userId,
-          'email': currentUser?.email ?? '',
-          'full_name': fullName.trim(),
-          'updated_at': DateTime.now().toIso8601String(),
-        });
+        try {
+          await _client.from('profiles').upsert({
+            'id': userId,
+            'email': currentUser?.email ?? '',
+            'full_name': fullName.trim(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        } catch (dbError) {
+          debugPrint('Profiles table upsert notice: $dbError');
+        }
       }
 
       return response;
@@ -178,6 +185,7 @@ class AuthService {
   /// Sign out current user
   Future<void> signOut() async {
     try {
+      await CacheService().clearAllCache();
       await _client.auth.signOut();
     } on AuthException catch (e) {
       throw _parseAuthError(e.message);

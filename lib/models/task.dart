@@ -6,6 +6,7 @@ class Task {
   final String? courseId;
   final String title;
   final String? description;
+  final String? type;
   final DateTime? dueDate;
   final bool isCompleted;
   final DateTime? createdAt;
@@ -17,6 +18,7 @@ class Task {
     this.courseId,
     required this.title,
     this.description,
+    this.type = 'assignment',
     this.dueDate,
     this.isCompleted = false,
     this.createdAt,
@@ -33,14 +35,25 @@ class Task {
 
     final dueDateStr = json['due_at'] ?? json['due_date'];
 
+    final rawCompleted = json['is_completed'] ?? json['completed'] ?? json['isCompleted'];
+    bool completedVal = false;
+    if (rawCompleted is bool) {
+      completedVal = rawCompleted;
+    } else if (rawCompleted is String) {
+      completedVal = rawCompleted.toLowerCase() == 'true' || rawCompleted == '1';
+    } else if (rawCompleted is num) {
+      completedVal = rawCompleted == 1;
+    }
+
     return Task(
       id: json['id'] as String,
-      userId: json['user_id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? json['userId'] as String? ?? '',
       courseId: json['course_id'] as String?,
       title: json['title'] as String? ?? '',
       description: json['description'] as String?,
+      type: json['type'] as String? ?? 'assignment',
       dueDate: dueDateStr != null ? DateTime.tryParse(dueDateStr as String) : null,
-      isCompleted: json['is_completed'] as bool? ?? json['isCompleted'] as bool? ?? false,
+      isCompleted: completedVal,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       course: courseObj,
     );
@@ -53,9 +66,11 @@ class Task {
       if (courseId != null) 'course_id': courseId,
       'title': title,
       if (description != null) 'description': description,
+      if (type != null) 'type': type,
       if (dueDate != null) 'due_at': dueDate?.toIso8601String(),
       'is_completed': isCompleted,
       if (createdAt != null) 'created_at': createdAt?.toIso8601String(),
+      if (course != null) 'courses': course?.toJson(),
     };
   }
 
@@ -65,6 +80,7 @@ class Task {
     String? courseId,
     String? title,
     String? description,
+    String? type,
     DateTime? dueDate,
     bool? isCompleted,
     DateTime? createdAt,
@@ -76,6 +92,7 @@ class Task {
       courseId: courseId ?? this.courseId,
       title: title ?? this.title,
       description: description ?? this.description,
+      type: type ?? this.type,
       dueDate: dueDate ?? this.dueDate,
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt ?? this.createdAt,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/navigation_providers.dart';
+import '../providers/notification_providers.dart';
 import '../theme/app_colors.dart';
 import '../widgets/ai_node_icon.dart';
 import '../widgets/cookie_consent_banner.dart';
@@ -21,6 +22,9 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Keep class & task notification reminders in sync automatically
+    ref.watch(notificationSyncProvider);
+
     final activeIndex = ref.watch(activeTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
