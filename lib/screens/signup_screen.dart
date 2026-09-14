@@ -119,7 +119,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   children: [
                     const BrandHeader(
                       title: 'Create Account',
-                      subtitle: 'Join Academic Assistant to organize your study life.',
+                      subtitle: 'Join Sentry to organize your study life.',
                       icon: Icons.person_add_alt_1_rounded,
                     ),
                     const SizedBox(height: 32),

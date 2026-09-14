@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String appName = 'Academic Assistant';
+  static const String appName = 'Sentry';
   static const String appTagline = 'Your Intelligent Academic Companion';
   
   // Validation messages

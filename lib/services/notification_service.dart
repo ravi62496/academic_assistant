@@ -369,7 +369,7 @@ class NotificationService {
 
     await _notificationsPlugin.show(
       9999,
-      'Academic Assistant Notifications Active',
+      'Sentry Notifications Active',
       'Class reminders and daily briefings are set up!',
       notificationDetails,
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/navigation_providers.dart';
 import '../providers/notification_providers.dart';
+import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
@@ -208,7 +209,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Are you sure you want to log out of Academic Assistant?',
+          'Are you sure you want to log out of Sentry?',
           style: GoogleFonts.plusJakartaSans(fontSize: 14),
         ),
         actions: [
@@ -372,6 +373,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 24),
+
+            // Appearance & Theme
+            Text(
+              'Appearance & Theme',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            _buildThemeSelectionCard(context),
 
             const SizedBox(height: 24),
 
@@ -633,6 +649,97 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             color: AppColors.textSecondary,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildThemeSelectionCard(BuildContext context) {
+    final currentTheme = ref.watch(themeModeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final options = [
+      (ThemeMode.light, 'Light Mode', 'Default theme', Icons.wb_sunny_outlined),
+      (ThemeMode.dark, 'Dark Mode', 'Low light theme', Icons.dark_mode_outlined),
+      (ThemeMode.system, 'System Mode', 'Follows OS theme', Icons.brightness_auto_outlined),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+      ),
+      child: Row(
+        children: options.map((option) {
+          final mode = option.$1;
+          final label = option.$2;
+          final subtitle = option.$3;
+          final icon = option.$4;
+          final isSelected = currentTheme == mode;
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: InkWell(
+                onTap: () {
+                  ref.read(themeModeProvider.notifier).setThemeMode(mode);
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary.withValues(alpha: isDark ? 0.22 : 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 22,
+                        color: isSelected
+                            ? AppColors.primary
+                            : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        label,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected
+                              ? AppColors.primary.withValues(alpha: 0.85)
+                              : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

@@ -216,7 +216,7 @@ class AiAssistantService {
     required String apiKey,
   }) async {
     final nowStr = DateTime.now().toIso8601String();
-    final systemPrompt = '''You are an AI Academic Assistant for a student app.
+    final systemPrompt = '''You are Sentry, an AI Academic Assistant for a student app.
 Current Date/Time: $nowStr
 Current Courses: ${jsonEncode(courses.map((c) => c.toJson()).toList())}
 Current Recurring Class Schedules: ${jsonEncode(classes.map((c) => c.toJson()).toList())}
