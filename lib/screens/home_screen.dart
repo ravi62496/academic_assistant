@@ -212,73 +212,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Add New Task',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Add New Task',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close task dialog',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Task Title (e.g. Read Chapter 4)',
-                      prefixIcon: Icon(Icons.check_circle_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: descController,
-                    decoration: const InputDecoration(
-                      hintText: 'Notes / Details (optional)',
-                      prefixIcon: Icon(Icons.notes_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  coursesAsync.when(
-                    data: (courses) {
-                      if (courses.isEmpty) return const SizedBox.shrink();
-                      return DropdownButtonFormField<String>(
-                        initialValue: selectedCourseId,
-                        decoration: const InputDecoration(
-                          hintText: 'Select Course (optional)',
-                          prefixIcon: Icon(Icons.school_outlined),
+                        IconButton(
+                          tooltip: 'Close task dialog',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(ctx).pop(),
                         ),
-                        items: courses.map((c) {
-                          return DropdownMenuItem(
-                            value: c.id,
-                            child: Text('${c.code != null ? "${c.code} - " : ""}${c.name}'),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setModalState(() => selectedCourseId = val),
-                      );
-                    },
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, _) => const SizedBox.shrink(),
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'Task Title (e.g. Read Chapter 4)',
+                        prefixIcon: Icon(Icons.check_circle_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        hintText: 'Notes / Details (optional)',
+                        prefixIcon: Icon(Icons.notes_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    coursesAsync.when(
+                      data: (courses) {
+                        if (courses.isEmpty) return const SizedBox.shrink();
+                        return DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: selectedCourseId,
+                          decoration: const InputDecoration(
+                            hintText: 'Select Course (optional)',
+                            prefixIcon: Icon(Icons.school_outlined),
+                          ),
+                          items: courses.map((c) {
+                            return DropdownMenuItem(
+                              value: c.id,
+                              child: Text(
+                                '${c.code != null ? "${c.code} - " : ""}${c.name}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setModalState(() => selectedCourseId = val),
+                        );
+                      },
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                    ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -374,10 +379,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      );
+    },
     );
   }
 
