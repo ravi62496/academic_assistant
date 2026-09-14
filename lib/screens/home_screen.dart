@@ -545,13 +545,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          AppConstants.appName,
-          style: GoogleFonts.spaceGrotesk(
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-            letterSpacing: -0.5,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'Assets/images/Sentry.png',
+              width: 28,
+              height: 28,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              AppConstants.appName,
+              style: GoogleFonts.spaceGrotesk(
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: AppColors.sentryGreen,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(

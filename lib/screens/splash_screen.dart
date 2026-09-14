@@ -17,31 +17,33 @@ class SplashScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
+                color: AppColors.sentryGreen.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
+                border: Border.all(color: AppColors.sentryGreen.withValues(alpha: 0.35), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.sentryGreen.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.school_rounded,
-                color: AppColors.primary,
-                size: 48,
+              child: Image.asset(
+                'Assets/images/Sentry.png',
+                width: 64,
+                height: 64,
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               AppConstants.appName,
               style: GoogleFonts.spaceGrotesk(
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
+                color: AppColors.sentryGreen,
                 letterSpacing: -0.5,
               ),
             ),

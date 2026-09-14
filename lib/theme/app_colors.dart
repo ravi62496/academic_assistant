@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 /// distinct schedule accents, and dedicated AI mode highlights.
 class AppColors {
   // Brand & Accent Colors
-  static const primary = Color(0xFF4E9F8E);       // Serene Warm Sage Teal (Schedule & Timetable Accent)
-  static const primaryDark = Color(0xFF356B60);   // Deep Muted Sage
+  static const sentryGreen = Color(0xFF1E9E64);   // Vibrant Emerald Green (Sentry Shield Accent)
+  static const primary = Color(0xFF1E9E64);       // Sentry Emerald Green Primary Accent
+  static const primaryDark = Color(0xFF146C43);   // Deep Emerald Green
   static const aiAccent = Color(0xFF9D7BFF);      // Electric Violet / Indigo Node (Dedicated AI Mode Accent)
   static const aiAccentGlow = Color(0x3D9D7BFF);  // Soft Violet Glow for AI Containers
   static const secondary = Color(0xFFE5A958);     // Warm Amber Sand

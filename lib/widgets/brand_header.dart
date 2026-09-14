@@ -6,13 +6,13 @@ import '../utils/constants.dart';
 class BrandHeader extends StatelessWidget {
   final String title;
   final String subtitle;
-  final IconData icon;
+  final IconData? icon;
 
   const BrandHeader({
     super.key,
     required this.title,
     required this.subtitle,
-    this.icon = Icons.school_rounded,
+    this.icon,
   });
 
   @override
@@ -25,13 +25,18 @@ class BrandHeader extends StatelessWidget {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
+                color: AppColors.sentryGreen.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 1.2),
+                border: Border.all(color: AppColors.sentryGreen.withValues(alpha: 0.3), width: 1.2),
               ),
-              child: Icon(icon, color: AppColors.primary, size: 26),
+              child: Image.asset(
+                'Assets/images/Sentry.png',
+                width: 32,
+                height: 32,
+                fit: BoxFit.contain,
+              ),
             ),
             const SizedBox(width: 14),
             Column(
@@ -40,9 +45,9 @@ class BrandHeader extends StatelessWidget {
                 Text(
                   AppConstants.appName,
                   style: GoogleFonts.spaceGrotesk(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    color: AppColors.sentryGreen,
                     letterSpacing: -0.3,
                   ),
                 ),
