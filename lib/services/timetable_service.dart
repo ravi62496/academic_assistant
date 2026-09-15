@@ -217,4 +217,15 @@ class TimetableService {
     effectiveClasses.sort((a, b) => a.startTime.compareTo(b.startTime));
     return effectiveClasses;
   }
+
+  /// Listen to real-time class updates (cancellations, postponements) from Supabase
+  Stream<List<Map<String, dynamic>>> streamClassUpdates() {
+    final userId = _currentUserId;
+    if (userId == null) return const Stream.empty();
+
+    return _client
+        .from('class_updates')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId);
+  }
 }

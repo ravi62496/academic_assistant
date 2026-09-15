@@ -22,6 +22,7 @@ class AuthWrapper extends StatelessWidget {
         final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
 
         if (session != null) {
+          authService.saveGmailRefreshToken();
           return const MainShell();
         }
 

@@ -1601,16 +1601,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         : (isOverdue ? AppColors.error : AppColors.warning),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    isOverdue
-                        ? 'Overdue • ${DateFormat('MMM d, h:mm a').format(task.dueDate!)}'
-                        : 'Due ${DateFormat('EEE, MMM d • h:mm a').format(task.dueDate!)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: task.isCompleted
-                          ? AppColors.textSecondary
-                          : (isOverdue ? AppColors.error : AppColors.warning),
-                      fontWeight: FontWeight.w500,
+                  Flexible(
+                    child: Text(
+                      isOverdue
+                          ? 'Overdue • ${DateFormat('MMM d, h:mm a').format(task.dueDate!)}'
+                          : 'Due ${DateFormat('EEE, MMM d • h:mm a').format(task.dueDate!)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: task.isCompleted
+                            ? AppColors.textSecondary
+                            : (isOverdue ? AppColors.error : AppColors.warning),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

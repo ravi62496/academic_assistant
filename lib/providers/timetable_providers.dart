@@ -125,3 +125,10 @@ final scheduleForDateProvider = FutureProvider.family<List<ClassSchedule>, DateT
     rethrow;
   }
 });
+
+/// StreamProvider listening to real-time class updates from Supabase
+final classUpdatesStreamProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final service = ref.watch(timetableServiceProvider);
+  return service.streamClassUpdates();
+});
+

@@ -23,6 +23,39 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final AuthService _authService = AuthService();
+  bool _readAllEmails = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileSettings();
+  }
+
+  Future<void> _loadProfileSettings() async {
+    try {
+      final profile = await _authService.getProfile();
+      if (profile != null && mounted) {
+        setState(() {
+          _readAllEmails = profile['read_all_emails'] ?? false;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateReadAllEmails(bool value) async {
+    setState(() => _readAllEmails = value);
+    try {
+      await _authService.updateReadAllEmails(value);
+      if (mounted) {
+        SnackbarUtils.showSuccess(context, 'Email scanning preference updated!');
+      }
+    } catch (e) {
+      setState(() => _readAllEmails = !value);
+      if (mounted) {
+        SnackbarUtils.showError(context, 'Failed to update preference: $e');
+      }
+    }
+  }
 
   void _showEditNameDialog(String currentName) {
     final nameController = TextEditingController(text: currentName);
@@ -379,6 +412,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
+            // Email Scanning & Privacy
+            Text(
+              'Email Scanning & Privacy',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            _buildSwitchTile(
+              context: context,
+              icon: Icons.mark_email_read_outlined,
+              iconColor: AppColors.primary,
+              title: 'Read All Inbox Emails',
+              subtitle: _readAllEmails
+                  ? 'Scanning all inbox messages for class cancellations/updates'
+                  : 'Scanning only specified trusted sender filters (Strict Privacy)',
+              value: _readAllEmails,
+              onChanged: _updateReadAllEmails,
+            ),
+
+            const SizedBox(height: 24),
+
             // Appearance & Theme
             Text(
               'Appearance & Theme',
@@ -463,6 +521,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onChanged: (val) {
                 ref.read(notificationSettingsProvider.notifier).toggleNightlyPreview(val);
               },
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    await ref.read(notificationServiceProvider).requestPermissions();
+                    await ref.read(notificationServiceProvider).sendTestNotification();
+                    if (context.mounted) {
+                      SnackbarUtils.showSuccess(context, 'Test notification sent!');
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      SnackbarUtils.showError(context, 'Failed to send notification: $e');
+                    }
+                  }
+                },
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: const Text(
+                  'Send Test Notification',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ),
 
             const SizedBox(height: 24),
@@ -634,6 +724,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             fontWeight: FontWeight.bold,
             fontSize: 15,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           subtitle,
@@ -641,6 +733,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             fontSize: 12,
             color: AppColors.textSecondary,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
       ),
@@ -682,6 +776,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             fontWeight: FontWeight.bold,
             fontSize: 15,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           subtitle,
@@ -689,6 +785,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             fontSize: 12,
             color: AppColors.textSecondary,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

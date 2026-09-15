@@ -97,17 +97,40 @@ class AuthService {
     }
   }
 
-  /// OAuth Sign-In (Google, Apple, Github, etc.)
-  Future<bool> signInWithOAuth(OAuthProvider provider) async {
+  /// OAuth Sign-In (Google, Apple, Github, etc.) with optional scopes and queryParams
+  Future<bool> signInWithOAuth(
+    OAuthProvider provider, {
+    String? scopes,
+    Map<String, String>? queryParams,
+  }) async {
     try {
-      return await _client.auth.signInWithOAuth(
+      final success = await _client.auth.signInWithOAuth(
         provider,
         redirectTo: 'academicassistant://login-callback/',
+        scopes: scopes,
+        queryParams: queryParams,
       );
+      return success;
     } on AuthException catch (e) {
       throw _parseAuthError(e.message);
     } catch (e) {
       throw _handleGenericError(e);
+    }
+  }
+
+  /// Save provider refresh token to gmail_tokens table if present
+  Future<void> saveGmailRefreshToken() async {
+    try {
+      final session = _client.auth.currentSession;
+      if (session?.providerRefreshToken != null && session?.user.id != null) {
+        await _client.from('gmail_tokens').upsert({
+          'user_id': session!.user.id,
+          'refresh_token': session.providerRefreshToken!,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Error saving gmail refresh token: $e');
     }
   }
 
@@ -154,6 +177,32 @@ class AuthService {
     } catch (e) {
       throw _handleGenericError(e);
     }
+  }
+
+  /// Get user profile data from public.profiles table
+  Future<Map<String, dynamic>?> getProfile() async {
+    final userId = currentUser?.id;
+    if (userId == null) return null;
+    try {
+      final res = await _client.from('profiles').select().eq('id', userId).maybeSingle();
+      return res;
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+      return null;
+    }
+  }
+
+  /// Update read_all_emails preference in public.profiles table
+  Future<void> updateReadAllEmails(bool readAll) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
+    await _client.from('profiles').upsert({
+      'id': userId,
+      'email': currentUser?.email ?? '',
+      'read_all_emails': readAll,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
   }
 
   /// Update password for currently authenticated user

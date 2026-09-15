@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/navigation_providers.dart';
 import '../providers/notification_providers.dart';
+import '../providers/timetable_providers.dart';
 import '../theme/app_colors.dart';
 import '../widgets/ai_node_icon.dart';
 import '../widgets/cookie_consent_banner.dart';
@@ -24,6 +25,25 @@ class MainShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Keep class & task notification reminders in sync automatically
     ref.watch(notificationSyncProvider);
+
+    // Listen to real-time class updates (cancellations/postponements)
+    ref.listen(classUpdatesStreamProvider, (previous, next) {
+      next.whenData((updates) {
+        if (updates.isNotEmpty) {
+          ref.invalidate(timetableProvider);
+          final latest = updates.last;
+          final course = latest['course'] ?? 'Course';
+          final action = latest['action'] ?? 'updated';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ $course class update: $action!'),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      });
+    });
 
     final activeIndex = ref.watch(activeTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
