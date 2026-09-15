@@ -199,9 +199,7 @@ class AuthService {
 
     await _client.from('profiles').upsert({
       'id': userId,
-      'email': currentUser?.email ?? '',
       'read_all_emails': readAll,
-      'updated_at': DateTime.now().toIso8601String(),
     }, onConflict: 'id');
   }
 
