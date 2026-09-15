@@ -675,36 +675,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
       ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          onTap: onTap,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: iconWidget ?? Icon(icon, color: iconColor, size: 20),
           ),
-          child: iconWidget ?? Icon(icon, color: iconColor, size: 20),
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.spaceGrotesk(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
+          title: Text(
+            title,
+            style: GoogleFonts.spaceGrotesk(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color: AppColors.textSecondary,
+          subtitle: Text(
+            subtitle,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
       ),
     );
   }
@@ -726,35 +730,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
       ),
-      child: SwitchListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        value: value,
-        onChanged: onChanged,
-        secondary: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: SwitchListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          value: value,
+          onChanged: onChanged,
+          secondary: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          child: Icon(icon, color: iconColor, size: 20),
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.spaceGrotesk(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
+          title: Text(
+            title,
+            style: GoogleFonts.spaceGrotesk(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color: AppColors.textSecondary,
+          subtitle: Text(
+            subtitle,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

@@ -1567,8 +1567,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             leading: Checkbox(
               value: task.isCompleted,
               activeColor: AppColors.primary,
@@ -1647,6 +1650,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                 }
               },
             ),
+          ),
           ),
         );
       },
