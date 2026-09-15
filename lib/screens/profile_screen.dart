@@ -522,38 +522,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ref.read(notificationSettingsProvider.notifier).toggleNightlyPreview(val);
               },
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    await ref.read(notificationServiceProvider).requestPermissions();
-                    await ref.read(notificationServiceProvider).sendTestNotification();
-                    if (context.mounted) {
-                      SnackbarUtils.showSuccess(context, 'Test notification sent!');
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      SnackbarUtils.showError(context, 'Failed to send notification: $e');
-                    }
-                  }
-                },
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text(
-                  'Send Test Notification',
-                  overflow: TextOverflow.ellipsis,
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
 
             const SizedBox(height: 24),
 
