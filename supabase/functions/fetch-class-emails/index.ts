@@ -8,101 +8,117 @@ Deno.serve(async (req) => {
 
   const { user_id } = await req.json();
 
-  // 1. Get stored refresh token, mint a fresh access token
-  const { data: tokenRow } = await supabase
-    .from('gmail_tokens')
-    .select('refresh_token')
-    .eq('user_id', user_id)
-    .single();
+  // 1. Get all linked Gmail accounts for this user (Multi-Account Support!)
+  const { data: accounts } = await supabase
+    .from('user_gmail_accounts')
+    .select('google_email, refresh_token')
+    .eq('user_id', user_id);
 
-  if (!tokenRow?.refresh_token) {
-    return new Response(JSON.stringify({ error: 'No refresh token found for user' }), { status: 400 });
-  }
+  const tokenList: Array<{ email: string; refresh_token: string }> = [];
 
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
-      client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
-      refresh_token: tokenRow.refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  });
-  const tokenData = await tokenRes.json();
-  const access_token = tokenData.access_token;
-
-  if (!access_token) {
-    return new Response(JSON.stringify({ error: 'Failed to refresh Google access token', details: tokenData }), { status: 400 });
-  }
-
-  // 2. Check user profile preference: read_all_emails
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('read_all_emails')
-    .eq('id', user_id)
-    .maybeSingle();
-
-  const readAll = profile?.read_all_emails ?? false;
-
-  let gmailQuery = '';
-  if (readAll) {
-    // User allows scanning all mails for schedule/cancellation keywords
-    gmailQuery = '(cancel OR postpone OR reschedule OR quiz OR class) newer_than:2d';
-  } else {
-    // Restrict strictly to user-specific allowed senders (Privacy Mode)
-    const { data: filters } = await supabase
-      .from('user_email_filters')
-      .select('sender_email')
-      .eq('user_id', user_id);
-
-    const allowedSenders = filters?.map((f: any) => f.sender_email) ?? [];
-    if (allowedSenders.length === 0) {
-      allowedSenders.push('academics@iitmandi.ac.in'); // default fallback
+  if (accounts && accounts.length > 0) {
+    for (const acc of accounts) {
+      tokenList.push({ email: acc.google_email, refresh_token: acc.refresh_token });
     }
-    const senderQuery = allowedSenders.map((s: string) => `from:${s}`).join(' OR ');
-    gmailQuery = `(${senderQuery}) newer_than:2d`;
+  } else {
+    // Fallback to gmail_tokens table for backwards compatibility
+    const { data: tokenRow } = await supabase
+      .from('gmail_tokens')
+      .select('refresh_token')
+      .eq('user_id', user_id)
+      .single();
+
+    if (tokenRow?.refresh_token) {
+      tokenList.push({ email: 'primary', refresh_token: tokenRow.refresh_token });
+    }
   }
 
-  // 3. Query Gmail
-  const gmailRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(gmailQuery)}`,
-    { headers: { Authorization: `Bearer ${access_token}` } },
-  );
-  const gmailData = await gmailRes.json();
-  const messages = gmailData.messages;
-  if (!messages?.length) return new Response(JSON.stringify({ processed: 0 }));
+  if (tokenList.length === 0) {
+    return new Response(JSON.stringify({ error: 'No Gmail refresh tokens found for user' }), { status: 400 });
+  }
 
-  let processed = 0;
-  for (const m of messages) {
-    // Skip if already processed
-    const { data: existing } = await supabase
-      .from('class_updates')
-      .select('id')
-      .eq('source_message_id', m.id)
+  let totalProcessed = 0;
+
+  // Loop through each linked Gmail inbox
+  for (const acc of tokenList) {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
+        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
+        refresh_token: acc.refresh_token,
+        grant_type: 'refresh_token',
+      }),
+    });
+    const tokenData = await tokenRes.json();
+    const access_token = tokenData.access_token;
+
+    if (!access_token) continue;
+
+    // Check user profile preference: read_all_emails
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('read_all_emails')
+      .eq('id', user_id)
       .maybeSingle();
-    if (existing) continue;
 
-    const msgRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+    const readAll = profile?.read_all_emails ?? false;
+
+    let gmailQuery = '';
+    if (readAll) {
+      gmailQuery = '(cancel OR postpone OR reschedule OR quiz OR class) newer_than:2d';
+    } else {
+      const { data: filters } = await supabase
+        .from('user_email_filters')
+        .select('sender_email')
+        .eq('user_id', user_id);
+
+      const allowedSenders = filters?.map((f: any) => f.sender_email) ?? [];
+      if (allowedSenders.length === 0) {
+        allowedSenders.push('academics@iitmandi.ac.in');
+      }
+      const senderQuery = allowedSenders.map((s: string) => `from:${s}`).join(' OR ');
+      gmailQuery = `(${senderQuery}) newer_than:2d`;
+    }
+
+    const gmailRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(gmailQuery)}`,
       { headers: { Authorization: `Bearer ${access_token}` } },
     );
-    const msg = await msgRes.json();
-    const subject = msg.payload.headers.find((h: any) => h.name === 'Subject')?.value ?? '';
-    const bodyText = extractBody(msg.payload);
+    const gmailData = await gmailRes.json();
+    const messages = gmailData.messages;
+    if (!messages?.length) continue;
 
-    const parsed = await parseClassUpdate(subject, bodyText);
-    if (!parsed) continue;
+    for (const m of messages) {
+      const { data: existing } = await supabase
+        .from('class_updates')
+        .select('id')
+        .eq('source_message_id', m.id)
+        .maybeSingle();
+      if (existing) continue;
 
-    await supabase.from('class_updates').insert({
-      user_id,
-      ...parsed,
-      source_message_id: m.id,
-    });
-    processed++;
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+        { headers: { Authorization: `Bearer ${access_token}` } },
+      );
+      const msg = await msgRes.json();
+      const subject = msg.payload.headers.find((h: any) => h.name === 'Subject')?.value ?? '';
+      const bodyText = extractBody(msg.payload);
+
+      const parsed = await parseClassUpdate(subject, bodyText);
+      if (!parsed) continue;
+
+      await supabase.from('class_updates').insert({
+        user_id,
+        ...parsed,
+        source_message_id: m.id,
+      });
+      totalProcessed++;
+    }
   }
 
-  return new Response(JSON.stringify({ processed }));
+  return new Response(JSON.stringify({ processed: totalProcessed }));
 });
 
 // Helper to extract email body from MIME structure

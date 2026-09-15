@@ -118,20 +118,52 @@ class AuthService {
     }
   }
 
-  /// Save provider refresh token to gmail_tokens table if present
+  /// Save provider refresh token to user_gmail_accounts table if present
   Future<void> saveGmailRefreshToken() async {
     try {
       final session = _client.auth.currentSession;
       if (session?.providerRefreshToken != null && session?.user.id != null) {
+        final userId = session!.user.id;
+        final refreshToken = session.providerRefreshToken!;
+        final googleEmail = session.user.email ?? session.user.userMetadata?['email'] ?? currentUser?.email ?? 'primary@gmail.com';
+
+        await _client.from('user_gmail_accounts').upsert({
+          'user_id': userId,
+          'google_email': googleEmail,
+          'refresh_token': refreshToken,
+        }, onConflict: 'user_id,google_email');
+
         await _client.from('gmail_tokens').upsert({
-          'user_id': session!.user.id,
-          'refresh_token': session.providerRefreshToken!,
+          'user_id': userId,
+          'refresh_token': refreshToken,
           'updated_at': DateTime.now().toIso8601String(),
         });
       }
     } catch (e) {
       debugPrint('Error saving gmail refresh token: $e');
     }
+  }
+
+  /// Get all linked Gmail accounts for current user
+  Future<List<Map<String, dynamic>>> getLinkedGmailAccounts() async {
+    final userId = currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final res = await _client
+          .from('user_gmail_accounts')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Error fetching linked gmail accounts: $e');
+      return [];
+    }
+  }
+
+  /// Remove a linked Gmail account by ID
+  Future<void> removeLinkedGmailAccount(String accountId) async {
+    await _client.from('user_gmail_accounts').delete().eq('id', accountId);
   }
 
   /// Send password reset email

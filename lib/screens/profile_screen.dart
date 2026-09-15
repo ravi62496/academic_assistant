@@ -26,12 +26,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _readAllEmails = false;
   List<Map<String, dynamic>> _emailFilters = [];
   bool _isLoadingFilters = true;
+  List<Map<String, dynamic>> _linkedAccounts = [];
+  bool _isLoadingAccounts = true;
 
   @override
   void initState() {
     super.initState();
     _loadProfileSettings();
     _loadEmailFilters();
+    _loadLinkedAccounts();
   }
 
   Future<void> _loadProfileSettings() async {
@@ -56,6 +59,49 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingFilters = false);
+    }
+  }
+
+  Future<void> _loadLinkedAccounts() async {
+    try {
+      final accounts = await _authService.getLinkedGmailAccounts();
+      if (mounted) {
+        setState(() {
+          _linkedAccounts = accounts;
+          _isLoadingAccounts = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAccounts = false);
+    }
+  }
+
+  Future<void> _linkAdditionalAccount() async {
+    try {
+      await _authService.linkAdditionalGoogleAccount();
+      await _authService.saveGmailRefreshToken();
+      await _loadLinkedAccounts();
+      if (mounted) {
+        SnackbarUtils.showSuccess(context, 'Institute Gmail account linked successfully!');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtils.showError(context, 'Failed to link account: $e');
+      }
+    }
+  }
+
+  Future<void> _removeLinkedAccount(String accountId) async {
+    try {
+      await _authService.removeLinkedGmailAccount(accountId);
+      await _loadLinkedAccounts();
+      if (mounted) {
+        SnackbarUtils.showSuccess(context, 'Gmail account unlinked');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtils.showError(context, 'Failed to unlink: $e');
+      }
     }
   }
 
@@ -617,6 +663,101 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
             ],
+
+            const SizedBox(height: 24),
+
+            // Linked Gmail Inboxes (Multi-Account Support)
+            Text(
+              'Linked Gmail Inboxes',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Link both your personal and institute Google accounts to scan both inboxes.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Connected Inboxes',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _linkAdditionalAccount,
+                          icon: const Icon(Icons.add_link, size: 16),
+                          label: const Text('Link Institute ID'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_isLoadingAccounts)
+                      const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                    else if (_linkedAccounts.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'No additional inboxes linked yet. (Primary login account is active)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _linkedAccounts.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, index) {
+                          final acc = _linkedAccounts[index];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.mark_email_unread_outlined, size: 18, color: AppColors.primary),
+                            title: Text(
+                              acc['google_email'] ?? 'Google Account',
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.link_off, size: 18, color: AppColors.error),
+                              onPressed: () => _removeLinkedAccount(acc['id']),
+                              tooltip: 'Unlink account',
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
 
             const SizedBox(height: 24),
 
