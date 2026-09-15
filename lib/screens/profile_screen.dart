@@ -24,11 +24,14 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final AuthService _authService = AuthService();
   bool _readAllEmails = false;
+  List<Map<String, dynamic>> _emailFilters = [];
+  bool _isLoadingFilters = true;
 
   @override
   void initState() {
     super.initState();
     _loadProfileSettings();
+    _loadEmailFilters();
   }
 
   Future<void> _loadProfileSettings() async {
@@ -40,6 +43,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadEmailFilters() async {
+    try {
+      final filters = await _authService.getEmailFilters();
+      if (mounted) {
+        setState(() {
+          _emailFilters = filters;
+          _isLoadingFilters = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingFilters = false);
+    }
   }
 
   Future<void> _updateReadAllEmails(bool value) async {
@@ -54,6 +71,91 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) {
         SnackbarUtils.showError(context, 'Failed to update preference: $e');
       }
+    }
+  }
+
+  void _showAddFilterDialog() {
+    final emailController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              'Add Trusted Sender',
+              style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
+            ),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: emailController,
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email Address',
+                  hintText: 'e.g., academics@iitmandi.ac.in',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Please enter an email address';
+                  }
+                  if (!val.contains('@') || !val.contains('.')) {
+                    return 'Please enter a valid email address';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        if (formKey.currentState?.validate() ?? false) {
+                          setModalState(() => isSaving = true);
+                          try {
+                            await _authService.addEmailFilter(emailController.text.trim());
+                            await _loadEmailFilters();
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            if (mounted) SnackbarUtils.showSuccess(context, 'Trusted sender added successfully!');
+                          } catch (e) {
+                            if (ctx.mounted) SnackbarUtils.showError(ctx, e.toString());
+                          } finally {
+                            if (ctx.mounted) setModalState(() => isSaving = false);
+                          }
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text('Add'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteFilter(String filterId) async {
+    try {
+      await _authService.deleteEmailFilter(filterId);
+      await _loadEmailFilters();
+      if (mounted) SnackbarUtils.showSuccess(context, 'Trusted sender removed');
+    } catch (e) {
+      if (mounted) SnackbarUtils.showError(context, 'Failed to remove: $e');
     }
   }
 
@@ -434,6 +536,87 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               value: _readAllEmails,
               onChanged: _updateReadAllEmails,
             ),
+
+            if (!_readAllEmails) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.between,
+                      children: [
+                        Text(
+                          'Trusted Senders List',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _showAddFilterDialog,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Add Sender'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sentry will only read emails from these specific senders.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_isLoadingFilters)
+                      const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                    else if (_emailFilters.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          'No custom senders added yet. Default fallback: academics@iitmandi.ac.in',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _emailFilters.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, index) {
+                          final filter = _emailFilters[index];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.alternate_email, size: 18, color: AppColors.primary),
+                            title: Text(
+                              filter['sender_email'] ?? '',
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                              onPressed: () => _deleteFilter(filter['id']),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 24),
 

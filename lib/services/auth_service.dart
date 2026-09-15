@@ -203,6 +203,39 @@ class AuthService {
     }, onConflict: 'id');
   }
 
+  /// Get user's custom trusted email filters
+  Future<List<Map<String, dynamic>>> getEmailFilters() async {
+    final userId = currentUser?.id;
+    if (userId == null) return [];
+    try {
+      final res = await _client
+          .from('user_email_filters')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Error fetching email filters: $e');
+      return [];
+    }
+  }
+
+  /// Add a trusted sender email filter
+  Future<void> addEmailFilter(String email) async {
+    final userId = currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
+    await _client.from('user_email_filters').insert({
+      'user_id': userId,
+      'sender_email': email.trim().toLowerCase(),
+    });
+  }
+
+  /// Delete a trusted sender email filter by ID
+  Future<void> deleteEmailFilter(String filterId) async {
+    await _client.from('user_email_filters').delete().eq('id', filterId);
+  }
+
   /// Update password for currently authenticated user
   Future<UserResponse> updatePassword(String newPassword) async {
     try {
