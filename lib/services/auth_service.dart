@@ -118,6 +118,18 @@ class AuthService {
     }
   }
 
+  /// Link an additional Google account with offline access & gmail scope
+  Future<bool> linkAdditionalGoogleAccount() async {
+    return await signInWithOAuth(
+      OAuthProvider.google,
+      scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+      queryParams: {
+        'access_type': 'offline',
+        'prompt': 'consent',
+      },
+    );
+  }
+
   /// Save provider refresh token to user_gmail_accounts table if present
   Future<void> saveGmailRefreshToken() async {
     try {

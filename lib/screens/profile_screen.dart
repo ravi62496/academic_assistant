@@ -641,7 +641,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _emailFilters.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, i) => const Divider(height: 1),
                         itemBuilder: (ctx, index) {
                           final filter = _emailFilters[index];
                           return ListTile(
@@ -735,7 +735,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _linkedAccounts.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, i) => const Divider(height: 1),
                         itemBuilder: (ctx, index) {
                           final acc = _linkedAccounts[index];
                           return ListTile(
