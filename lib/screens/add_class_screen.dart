@@ -49,6 +49,8 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
       _roomController.text = cs.room ?? '';
       _startTime = _parseTime(cs.startTime);
       _endTime = _parseTime(cs.endTime);
+    } else {
+      _selectedDayOfWeek = DateTime.now().weekday;
     }
   }
 
@@ -277,18 +279,34 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                                 ),
                               ),
                               child: Center(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    _daysShort[i],
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        _daysShort[i],
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    if (dayNum == DateTime.now().weekday) ...[
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        width: 4,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? Colors.white : AppColors.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),

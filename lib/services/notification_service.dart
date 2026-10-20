@@ -51,16 +51,27 @@ class NotificationService {
         tz.setLocalLocation(tz.getLocation(timeZoneName));
       } catch (_) {
         // Fallback: match by current DateTime offset if exact timezone string isn't in database
-        final offset = DateTime.now().timeZoneOffset;
-        final matchingLocation = tz.timeZoneDatabase.locations.values.firstWhere(
-          (loc) => loc.currentTimeZone.offset == offset.inMilliseconds,
-          orElse: () => tz.getLocation('UTC'),
-        );
-        tz.setLocalLocation(matchingLocation);
+        try {
+          final offsetMs = DateTime.now().timeZoneOffset.inMilliseconds;
+          tz.Location? matched;
+          for (final loc in tz.timeZoneDatabase.locations.values) {
+            try {
+              if (loc.currentTimeZone.offset == offsetMs) {
+                matched = loc;
+                break;
+              }
+            } catch (_) {}
+          }
+          tz.setLocalLocation(matched ?? tz.getLocation('UTC'));
+        } catch (_) {
+          tz.setLocalLocation(tz.getLocation('UTC'));
+        }
       }
     } catch (e) {
       debugPrint('Error initializing timezone: $e');
-      tz.setLocalLocation(tz.getLocation('UTC'));
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {}
     }
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -210,12 +221,96 @@ class NotificationService {
     }
   }
 
+  /// Safe zoned schedule helper trying alarmClock -> exactAllowWhileIdle -> inexactAllowWhileIdle
+  Future<void> _zonedScheduleWithFallback({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required NotificationDetails notificationDetails,
+    DateTimeComponents? matchDateTimeComponents,
+  }) async {
+    // 1. Try alarmClock mode (highest priority, immune to Doze mode and manufacturer battery restrictions)
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+      );
+      return;
+    } catch (e) {
+      debugPrint('alarmClock mode failed for $id, falling back to exactAllowWhileIdle: $e');
+    }
+
+    // 2. Fallback to exactAllowWhileIdle
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+      );
+      return;
+    } catch (e) {
+      debugPrint('exactAllowWhileIdle mode failed for $id, falling back to inexactAllowWhileIdle: $e');
+    }
+
+    // 3. Fallback to inexactAllowWhileIdle
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+      );
+    } catch (e) {
+      debugPrint('All schedule attempts failed for notification $id: $e');
+    }
+  }
+
   /// Schedule 10-minute pre-class reminders for upcoming weekly classes
   Future<void> scheduleClassReminders(List<ClassSchedule> classes) async {
     if (!_isInitialized) await initialize();
 
-    const scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
     final now = tz.TZDateTime.now(tz.local);
+
+    const androidClassDetails = AndroidNotificationDetails(
+      classChannelId,
+      classChannelName,
+      channelDescription: classChannelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      icon: '@mipmap/ic_launcher',
+      category: AndroidNotificationCategory.reminder,
+      visibility: NotificationVisibility.public,
+    );
+
+    const notificationDetails = NotificationDetails(
+      android: androidClassDetails,
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
 
     for (final cs in classes) {
       final timeParts = parseTimeString(cs.startTime);
@@ -271,109 +366,84 @@ class NotificationService {
           ? ' in Room ${cs.room}'
           : '';
 
-      final notificationId = (cs.id.hashCode.abs() % 900000) + 2000;
+      final baseId = (cs.id.hashCode.abs() % 400000) + 2000;
+      final oneShotId = baseId;
+      final recurringId = baseId + 400000;
 
-      // If the 10-minute alert time has passed, but class starts within next 10 minutes today
-      if (scheduledDate.isBefore(now)) {
-        if (classStartDate.isAfter(now)) {
-          // Send immediate alert for today's class starting shortly
-          try {
-            await _notificationsPlugin.zonedSchedule(
-              notificationId + 100000,
-              'Class Starting Soon: $courseName',
-              'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-              now.add(const Duration(seconds: 3)),
-              const NotificationDetails(
-                android: AndroidNotificationDetails(
-                  classChannelId,
-                  classChannelName,
-                  channelDescription: classChannelDescription,
-                  importance: Importance.max,
-                  priority: Priority.high,
-                  playSound: true,
-                  enableVibration: true,
-                  icon: '@mipmap/ic_launcher',
-                ),
-                iOS: DarwinNotificationDetails(
-                  presentAlert: true,
-                  presentBadge: true,
-                  presentSound: true,
-                ),
-              ),
-              androidScheduleMode: scheduleMode,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-            );
-          } catch (e) {
-            debugPrint('Error scheduling immediate reminder for ${cs.id}: $e');
-          }
-        }
-        // Advance recurring weekly schedule to next week
-        scheduledDate = scheduledDate.add(const Duration(days: 7));
-      }
+      // Case 1: Alert is today and in the future (e.g. class in 15 mins -> alert in 5 mins)
+      if (daysUntilClass == 0 && scheduledDate.isAfter(now)) {
+        // Schedule exact one-shot alarm today to guarantee immediate firing
+        await _zonedScheduleWithFallback(
+          id: oneShotId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: scheduledDate,
+          notificationDetails: notificationDetails,
+        );
 
-      try {
-        await _notificationsPlugin.zonedSchedule(
-          notificationId,
-          'Class Starting Soon: $courseName',
-          'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              classChannelId,
-              classChannelName,
-              channelDescription: classChannelDescription,
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
-              icon: '@mipmap/ic_launcher',
-            ),
-            iOS: DarwinNotificationDetails(
-              presentAlert: true,
-              presentBadge: true,
-              presentSound: true,
-            ),
-          ),
-          androidScheduleMode: scheduleMode,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
+        // Schedule weekly recurring alarm starting from next week
+        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
+        await _zonedScheduleWithFallback(
+          id: recurringId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: nextWeekDate,
+          notificationDetails: notificationDetails,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         );
-      } catch (e) {
-        debugPrint('Error scheduling class reminder for ${cs.id}: $e');
-        // Fallback to inexact schedule if exact scheduling fails
-        try {
-          await _notificationsPlugin.zonedSchedule(
-            notificationId,
-            'Class Starting Soon: $courseName',
-            'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-            scheduledDate,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                classChannelId,
-                classChannelName,
-                channelDescription: classChannelDescription,
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: '@mipmap/ic_launcher',
-              ),
-              iOS: DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          );
-        } catch (err) {
-          debugPrint('Fallback class reminder schedule failed for ${cs.id}: $err');
-        }
+      }
+      // Case 2: 10-minute alert time has passed, but class starts within the next 10 minutes today
+      else if (daysUntilClass == 0 && scheduledDate.isBefore(now) && classStartDate.isAfter(now)) {
+        await _zonedScheduleWithFallback(
+          id: oneShotId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: now.add(const Duration(seconds: 2)),
+          notificationDetails: notificationDetails,
+        );
+
+        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
+        await _zonedScheduleWithFallback(
+          id: recurringId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: nextWeekDate,
+          notificationDetails: notificationDetails,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
+      }
+      // Case 3: Today's class and alert have already passed
+      else if (daysUntilClass == 0 && scheduledDate.isBefore(now)) {
+        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
+        await _zonedScheduleWithFallback(
+          id: recurringId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: nextWeekDate,
+          notificationDetails: notificationDetails,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
+      }
+      // Case 4: Future day of the week
+      else {
+        // Schedule one-shot for upcoming occurrence
+        await _zonedScheduleWithFallback(
+          id: oneShotId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: scheduledDate,
+          notificationDetails: notificationDetails,
+        );
+
+        // And schedule recurring weekly
+        await _zonedScheduleWithFallback(
+          id: recurringId,
+          title: 'Class Starting Soon: $courseName',
+          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
+          scheduledDate: scheduledDate.add(const Duration(days: 7)),
+          notificationDetails: notificationDetails,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
       }
     }
   }
@@ -386,6 +456,28 @@ class NotificationService {
     required bool enableNightlyPreview,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
+
+    const androidDailyDetails = AndroidNotificationDetails(
+      dailyChannelId,
+      dailyChannelName,
+      channelDescription: dailyChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      icon: '@mipmap/ic_launcher',
+      category: AndroidNotificationCategory.reminder,
+      visibility: NotificationVisibility.public,
+    );
+
+    const dailyNotificationDetails = NotificationDetails(
+      android: androidDailyDetails,
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
 
     for (int weekday = 1; weekday <= 7; weekday++) {
       final dayName = _getDayName(weekday);
@@ -419,37 +511,14 @@ class NotificationService {
         }
 
         final morningId = morningBriefingBaseId + weekday;
-        try {
-          await _notificationsPlugin.zonedSchedule(
-            morningId,
-            '🌅 $dayName Schedule Briefing',
-            morningBody,
-            morningDate,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                dailyChannelId,
-                dailyChannelName,
-                channelDescription: dailyChannelDescription,
-                importance: Importance.high,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: '@mipmap/ic_launcher',
-              ),
-              iOS: DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          );
-        } catch (e) {
-          debugPrint('Error scheduling morning briefing for $dayName: $e');
-        }
+        await _zonedScheduleWithFallback(
+          id: morningId,
+          title: '🌅 $dayName Schedule Briefing',
+          body: morningBody,
+          scheduledDate: morningDate,
+          notificationDetails: dailyNotificationDetails,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
       }
 
       // 2. Nightly Preview (11:30 PM / 23:30) for tomorrow
@@ -484,37 +553,14 @@ class NotificationService {
         }
 
         final nightlyId = nightlyPreviewBaseId + weekday;
-        try {
-          await _notificationsPlugin.zonedSchedule(
-            nightlyId,
-            '🌙 Tomorrow\'s Preview ($tomorrowName)',
-            nightlyBody,
-            nightlyDate,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                dailyChannelId,
-                dailyChannelName,
-                channelDescription: dailyChannelDescription,
-                importance: Importance.high,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: '@mipmap/ic_launcher',
-              ),
-              iOS: DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          );
-        } catch (e) {
-          debugPrint('Error scheduling nightly preview for $dayName: $e');
-        }
+        await _zonedScheduleWithFallback(
+          id: nightlyId,
+          title: '🌙 Tomorrow\'s Preview ($tomorrowName)',
+          body: nightlyBody,
+          scheduledDate: nightlyDate,
+          notificationDetails: dailyNotificationDetails,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        );
       }
     }
   }
@@ -655,6 +701,40 @@ class NotificationService {
       '🔔 Sentry Notifications Active',
       'Class reminders and schedule briefings are working properly on your mobile device!',
       notificationDetails,
+    );
+  }
+
+  /// Schedule an exact test alarm (default 60 seconds) to verify background waking
+  Future<void> scheduleTestAlarm({int secondsFromNow = 60}) async {
+    if (!_isInitialized) await initialize();
+
+    final now = tz.TZDateTime.now(tz.local);
+    final triggerDate = now.add(Duration(seconds: secondsFromNow));
+
+    await _zonedScheduleWithFallback(
+      id: testNotificationId,
+      title: '⏰ Alarm Verification Successful!',
+      body: 'Exact alarms and background wake-up are working flawlessly on your device.',
+      scheduledDate: triggerDate,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          classChannelId,
+          classChannelName,
+          channelDescription: classChannelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+          category: AndroidNotificationCategory.alarm,
+          visibility: NotificationVisibility.public,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
     );
   }
 }

@@ -728,6 +728,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             _buildTile(
               context: context,
+              icon: Icons.timer_outlined,
+              iconColor: Colors.deepOrangeAccent,
+              title: 'Schedule 1-Minute Test Alarm',
+              subtitle: 'Tests exact alarm firing after 60s (works with screen locked)',
+              onTap: () async {
+                final notifService = ref.read(notificationServiceProvider);
+                await notifService.scheduleTestAlarm(secondsFromNow: 60);
+                if (context.mounted) {
+                  SnackbarUtils.showSuccess(
+                    context,
+                    '⏱️ Alarm scheduled for 60 seconds from now! You can lock your phone to test.',
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildTile(
+              context: context,
               icon: Icons.shield_outlined,
               iconColor: Colors.teal,
               title: 'Check Permission & Alarms Status',

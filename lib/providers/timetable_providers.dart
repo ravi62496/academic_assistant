@@ -51,6 +51,10 @@ class TimetableNotifier extends AsyncNotifier<List<ClassSchedule>> {
       endTime: endTime,
       room: room,
     );
+    final current = state.value ?? [];
+    final updated = [...current, newClass];
+    state = AsyncValue.data(updated);
+    await _cacheService.saveList(_cacheKey, updated, (cs) => cs.toJson());
     ref.invalidateSelf();
     return newClass;
   }
@@ -58,6 +62,10 @@ class TimetableNotifier extends AsyncNotifier<List<ClassSchedule>> {
   Future<ClassSchedule> updateClass(ClassSchedule classSchedule) async {
     final service = ref.read(timetableServiceProvider);
     final updated = await service.updateClass(classSchedule);
+    final current = state.value ?? [];
+    final next = current.map((c) => c.id == updated.id ? updated : c).toList();
+    state = AsyncValue.data(next);
+    await _cacheService.saveList(_cacheKey, next, (cs) => cs.toJson());
     ref.invalidateSelf();
     return updated;
   }
@@ -65,6 +73,10 @@ class TimetableNotifier extends AsyncNotifier<List<ClassSchedule>> {
   Future<void> deleteClass(String classScheduleId) async {
     final service = ref.read(timetableServiceProvider);
     await service.deleteClass(classScheduleId);
+    final current = state.value ?? [];
+    final next = current.where((c) => c.id != classScheduleId).toList();
+    state = AsyncValue.data(next);
+    await _cacheService.saveList(_cacheKey, next, (cs) => cs.toJson());
     ref.invalidateSelf();
   }
 
