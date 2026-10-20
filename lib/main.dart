@@ -29,8 +29,14 @@ Future<void> main() async {
     debugPrint('Could not load .env file: $e');
   }
 
-  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  String supabaseUrl = (dotenv.env['SUPABASE_URL'] ?? '').trim();
+  final supabaseAnonKey = (dotenv.env['SUPABASE_ANON_KEY'] ?? '').trim();
+
+  // Clean trailing /rest/v1 or trailing slashes if copied from Data API settings
+  supabaseUrl = supabaseUrl.replaceAll(RegExp(r'/rest/v1/?$'), '');
+  if (supabaseUrl.endsWith('/')) {
+    supabaseUrl = supabaseUrl.substring(0, supabaseUrl.length - 1);
+  }
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
     await Supabase.initialize(

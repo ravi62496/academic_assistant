@@ -705,6 +705,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ref.read(notificationSettingsProvider.notifier).toggleNightlyPreview(val);
               },
             ),
+            const SizedBox(height: 12),
+
+            _buildTile(
+              context: context,
+              icon: Icons.notifications_active_outlined,
+              iconColor: AppColors.primary,
+              title: 'Send Test Notification',
+              subtitle: 'Trigger an immediate test alert with sound & banner',
+              onTap: () async {
+                final notifService = ref.read(notificationServiceProvider);
+                await notifService.sendTestNotification();
+                if (context.mounted) {
+                  SnackbarUtils.showSuccess(
+                    context,
+                    '🔔 Test notification sent! Check your notification bar.',
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+
+            _buildTile(
+              context: context,
+              icon: Icons.shield_outlined,
+              iconColor: Colors.teal,
+              title: 'Check Permission & Alarms Status',
+              subtitle: 'Verify system notification & exact alarm access',
+              onTap: () async {
+                final notifService = ref.read(notificationServiceProvider);
+                await notifService.requestPermissions();
+                final status = await notifService.checkPermissionsStatus();
+                if (context.mounted) {
+                  final notifOk = status['notifications'] ?? false;
+                  final alarmOk = status['exactAlarms'] ?? false;
+                  if (notifOk && alarmOk) {
+                    SnackbarUtils.showSuccess(
+                      context,
+                      '✅ Notifications & Alarms are fully active on this device!',
+                    );
+                  } else if (!notifOk) {
+                    SnackbarUtils.showError(
+                      context,
+                      '⚠️ Notifications are disabled in Android Settings for this app.',
+                    );
+                  } else {
+                    SnackbarUtils.showInfo(
+                      context,
+                      'ℹ️ Exact alarms permission may need approval in system settings.',
+                    );
+                  }
+                }
+              },
+            ),
 
             const SizedBox(height: 24),
 

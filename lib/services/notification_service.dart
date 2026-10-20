@@ -18,8 +18,10 @@ class NotificationService {
   bool get isInitialized => _isInitialized;
 
   /// Notification Channels & IDs
-  static const int morningBriefingNotificationId = 1001;
-  static const int nightlyPreviewNotificationId = 1002;
+  static const int morningBriefingBaseId = 1010;
+  static const int nightlyPreviewBaseId = 1020;
+  static const int instantNotificationId = 9998;
+  static const int testNotificationId = 9999;
 
   static const String classChannelId = 'class_reminders';
   static const String classChannelName = 'Class Reminders';
@@ -29,14 +31,33 @@ class NotificationService {
   static const String dailyChannelName = 'Daily Briefings';
   static const String dailyChannelDescription = 'Morning schedule briefing and nightly next-day preview';
 
-  /// Initialize notification plugin & timezones
+  // Synchronization lock to prevent overlapping cancel/schedule race conditions
+  bool _isUpdating = false;
+  bool _needsReupdate = false;
+  List<ClassSchedule>? _pendingClasses;
+  List<Task>? _pendingTasks;
+  bool? _pendingClassAlerts;
+  bool? _pendingMorningBriefing;
+  bool? _pendingNightlyPreview;
+
+  /// Initialize notification plugin, timezones, and system notification channels
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
       tz.initializeTimeZones();
       final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      try {
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+      } catch (_) {
+        // Fallback: match by current DateTime offset if exact timezone string isn't in database
+        final offset = DateTime.now().timeZoneOffset;
+        final matchingLocation = tz.timeZoneDatabase.locations.values.firstWhere(
+          (loc) => loc.currentTimeZone.offset == offset.inMilliseconds,
+          orElse: () => tz.getLocation('UTC'),
+        );
+        tz.setLocalLocation(matchingLocation);
+      }
     } catch (e) {
       debugPrint('Error initializing timezone: $e');
       tz.setLocalLocation(tz.getLocation('UTC'));
@@ -55,6 +76,37 @@ class NotificationService {
     );
 
     await _notificationsPlugin.initialize(initSettings);
+
+    // Register Android notification channels explicitly in NotificationManager
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          classChannelId,
+          classChannelName,
+          description: classChannelDescription,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+        ),
+      );
+
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          dailyChannelId,
+          dailyChannelName,
+          description: dailyChannelDescription,
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+        ),
+      );
+    }
+
     _isInitialized = true;
   }
 
@@ -67,7 +119,11 @@ class NotificationService {
 
     if (androidImplementation != null) {
       final granted = await androidImplementation.requestNotificationsPermission();
-      await androidImplementation.requestExactAlarmsPermission();
+      try {
+        await androidImplementation.requestExactAlarmsPermission();
+      } catch (e) {
+        debugPrint('Exact alarms request notice: $e');
+      }
       return granted ?? false;
     }
 
@@ -86,6 +142,38 @@ class NotificationService {
     return true;
   }
 
+  /// Check whether notifications are enabled in device settings
+  Future<bool> areNotificationsEnabled() async {
+    if (!_isInitialized) await initialize();
+
+    final androidImplementation = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImplementation != null) {
+      return (await androidImplementation.areNotificationsEnabled()) ?? false;
+    }
+
+    return true;
+  }
+
+  /// Check permissions status summary
+  Future<Map<String, bool>> checkPermissionsStatus() async {
+    if (!_isInitialized) await initialize();
+
+    final androidImplementation = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+    bool notificationsAllowed = true;
+
+    if (androidImplementation != null) {
+      notificationsAllowed = (await androidImplementation.areNotificationsEnabled()) ?? false;
+    }
+
+    return {
+      'notifications': notificationsAllowed,
+      'exactAlarms': true,
+    };
+  }
+
   /// Parse HH:mm or HH:mm:ss string into [int hour, int minute]
   static List<int> parseTimeString(String timeStr) {
     try {
@@ -101,14 +189,25 @@ class NotificationService {
     return [0, 0];
   }
 
-  /// Helper to get next occurrence of a given DateTime
-  static tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
+  static String _getDayName(int dayOfWeek) {
+    switch (dayOfWeek) {
+      case 1:
+        return 'Monday';
+      case 2:
+        return 'Tuesday';
+      case 3:
+        return 'Wednesday';
+      case 4:
+        return 'Thursday';
+      case 5:
+        return 'Friday';
+      case 6:
+        return 'Saturday';
+      case 7:
+        return 'Sunday';
+      default:
+        return 'Day $dayOfWeek';
     }
-    return scheduledDate;
   }
 
   /// Schedule 10-minute pre-class reminders for upcoming weekly classes
@@ -191,6 +290,8 @@ class NotificationService {
                   channelDescription: classChannelDescription,
                   importance: Importance.max,
                   priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
                   icon: '@mipmap/ic_launcher',
                 ),
                 iOS: DarwinNotificationDetails(
@@ -224,6 +325,8 @@ class NotificationService {
               channelDescription: classChannelDescription,
               importance: Importance.max,
               priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
               icon: '@mipmap/ic_launcher',
             ),
             iOS: DarwinNotificationDetails(
@@ -253,6 +356,8 @@ class NotificationService {
                 channelDescription: classChannelDescription,
                 importance: Importance.max,
                 priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
                 icon: '@mipmap/ic_launcher',
               ),
               iOS: DarwinNotificationDetails(
@@ -273,126 +378,143 @@ class NotificationService {
     }
   }
 
-  /// Schedule Daily Morning Briefing at 7:30 AM
-  Future<void> scheduleDailyMorningBriefing({
-    required String body,
-    int hour = 7,
-    int minute = 30,
+  /// Schedule weekday-specific recurring morning briefings (7:30 AM) & nightly previews (11:30 PM)
+  Future<void> _scheduleAllBriefingsAndPreviews({
+    required List<ClassSchedule> classes,
+    required List<Task> tasks,
+    required bool enableMorningBriefing,
+    required bool enableNightlyPreview,
   }) async {
-    if (!_isInitialized) await initialize();
+    final now = tz.TZDateTime.now(tz.local);
 
-    final scheduledDate = _nextInstanceOfTime(hour, minute);
+    for (int weekday = 1; weekday <= 7; weekday++) {
+      final dayName = _getDayName(weekday);
+      final dayClasses = classes.where((c) => c.dayOfWeek == weekday).toList();
 
-    try {
-      await _notificationsPlugin.zonedSchedule(
-        morningBriefingNotificationId,
-        '🌅 Good Morning! Today\'s Schedule',
-        body,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            dailyChannelId,
-            dailyChannelName,
-            channelDescription: dailyChannelDescription,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
-    } catch (e) {
-      debugPrint('Error scheduling morning briefing with exact mode: $e');
-      try {
-        await _notificationsPlugin.zonedSchedule(
-          morningBriefingNotificationId,
-          '🌅 Good Morning! Today\'s Schedule',
-          body,
-          scheduledDate,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              dailyChannelId,
-              dailyChannelName,
-              channelDescription: dailyChannelDescription,
-              importance: Importance.defaultImportance,
-              priority: Priority.defaultPriority,
-              icon: '@mipmap/ic_launcher',
+      // 1. Morning Briefing (7:30 AM) for this weekday
+      if (enableMorningBriefing) {
+        int daysUntil = weekday - now.weekday;
+        if (daysUntil < 0) daysUntil += 7;
+
+        var morningDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          7,
+          30,
+        ).add(Duration(days: daysUntil));
+
+        if (morningDate.isBefore(now)) {
+          morningDate = morningDate.add(const Duration(days: 7));
+        }
+
+        String morningBody;
+        if (dayClasses.isEmpty) {
+          morningBody = 'No classes scheduled for $dayName. Have a productive day!';
+        } else {
+          final first = dayClasses.first;
+          final courseName = first.course?.name ?? first.course?.code ?? 'First class';
+          morningBody = 'You have ${dayClasses.length} class(es) today. Starting with $courseName at ${first.startTime}.';
+        }
+
+        final morningId = morningBriefingBaseId + weekday;
+        try {
+          await _notificationsPlugin.zonedSchedule(
+            morningId,
+            '🌅 $dayName Schedule Briefing',
+            morningBody,
+            morningDate,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                dailyChannelId,
+                dailyChannelName,
+                channelDescription: dailyChannelDescription,
+                importance: Importance.high,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+                icon: '@mipmap/ic_launcher',
+              ),
+              iOS: DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
             ),
-            iOS: DarwinNotificationDetails(),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-      } catch (err) {
-        debugPrint('Fallback scheduling morning briefing failed: $err');
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+        } catch (e) {
+          debugPrint('Error scheduling morning briefing for $dayName: $e');
+        }
       }
-    }
-  }
 
-  /// Schedule Nightly Preview at 11:30 PM (23:30)
-  Future<void> scheduleNightlyPreview({
-    required String body,
-    int hour = 23,
-    int minute = 30,
-  }) async {
-    if (!_isInitialized) await initialize();
+      // 2. Nightly Preview (11:30 PM / 23:30) for tomorrow
+      if (enableNightlyPreview) {
+        final tomorrowWeekday = (weekday % 7) + 1;
+        final tomorrowName = _getDayName(tomorrowWeekday);
+        final tomorrowClasses = classes.where((c) => c.dayOfWeek == tomorrowWeekday).toList();
 
-    final scheduledDate = _nextInstanceOfTime(hour, minute);
+        int daysUntilNight = weekday - now.weekday;
+        if (daysUntilNight < 0) daysUntilNight += 7;
 
-    try {
-      await _notificationsPlugin.zonedSchedule(
-        nightlyPreviewNotificationId,
-        '🌙 Tomorrow\'s Schedule Preview',
-        body,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            dailyChannelId,
-            dailyChannelName,
-            channelDescription: dailyChannelDescription,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
-    } catch (e) {
-      debugPrint('Error scheduling nightly preview with exact mode: $e');
-      try {
-        await _notificationsPlugin.zonedSchedule(
-          nightlyPreviewNotificationId,
-          '🌙 Tomorrow\'s Schedule Preview',
-          body,
-          scheduledDate,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              dailyChannelId,
-              dailyChannelName,
-              channelDescription: dailyChannelDescription,
-              importance: Importance.defaultImportance,
-              priority: Priority.defaultPriority,
-              icon: '@mipmap/ic_launcher',
+        var nightlyDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          23,
+          30,
+        ).add(Duration(days: daysUntilNight));
+
+        if (nightlyDate.isBefore(now)) {
+          nightlyDate = nightlyDate.add(const Duration(days: 7));
+        }
+
+        String nightlyBody;
+        if (tomorrowClasses.isEmpty) {
+          nightlyBody = 'No classes scheduled for tomorrow ($tomorrowName). Rest well!';
+        } else {
+          final first = tomorrowClasses.first;
+          final courseName = first.course?.name ?? first.course?.code ?? 'First class';
+          nightlyBody = 'Tomorrow: ${tomorrowClasses.length} class(es). First up: $courseName at ${first.startTime}.';
+        }
+
+        final nightlyId = nightlyPreviewBaseId + weekday;
+        try {
+          await _notificationsPlugin.zonedSchedule(
+            nightlyId,
+            '🌙 Tomorrow\'s Preview ($tomorrowName)',
+            nightlyBody,
+            nightlyDate,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                dailyChannelId,
+                dailyChannelName,
+                channelDescription: dailyChannelDescription,
+                importance: Importance.high,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+                icon: '@mipmap/ic_launcher',
+              ),
+              iOS: DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
             ),
-            iOS: DarwinNotificationDetails(),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-      } catch (err) {
-        debugPrint('Fallback scheduling nightly preview failed: $err');
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+        } catch (e) {
+          debugPrint('Error scheduling nightly preview for $dayName: $e');
+        }
       }
     }
   }
@@ -403,7 +525,7 @@ class NotificationService {
     await _notificationsPlugin.cancelAll();
   }
 
-  /// Re-sync all notifications based on current classes & tasks
+  /// Re-sync all notifications based on current classes & tasks with concurrency protection
   Future<void> updateAllSchedules({
     required List<ClassSchedule> classes,
     required List<Task> tasks,
@@ -411,70 +533,95 @@ class NotificationService {
     bool enableMorningBriefing = true,
     bool enableNightlyPreview = true,
   }) async {
+    if (_isUpdating) {
+      // Queue update so it sequentially re-runs after current execution finishes
+      _needsReupdate = true;
+      _pendingClasses = classes;
+      _pendingTasks = tasks;
+      _pendingClassAlerts = enableClassAlerts;
+      _pendingMorningBriefing = enableMorningBriefing;
+      _pendingNightlyPreview = enableNightlyPreview;
+      return;
+    }
+
+    _isUpdating = true;
+    try {
+      if (!_isInitialized) await initialize();
+
+      await cancelAll();
+
+      if (enableClassAlerts && classes.isNotEmpty) {
+        await scheduleClassReminders(classes);
+      }
+
+      await _scheduleAllBriefingsAndPreviews(
+        classes: classes,
+        tasks: tasks,
+        enableMorningBriefing: enableMorningBriefing,
+        enableNightlyPreview: enableNightlyPreview,
+      );
+    } finally {
+      _isUpdating = false;
+      if (_needsReupdate) {
+        _needsReupdate = false;
+        final nextClasses = _pendingClasses ?? classes;
+        final nextTasks = _pendingTasks ?? tasks;
+        final nextAlerts = _pendingClassAlerts ?? enableClassAlerts;
+        final nextMorning = _pendingMorningBriefing ?? enableMorningBriefing;
+        final nextNightly = _pendingNightlyPreview ?? enableNightlyPreview;
+        _pendingClasses = null;
+        _pendingTasks = null;
+        _pendingClassAlerts = null;
+        _pendingMorningBriefing = null;
+        _pendingNightlyPreview = null;
+        await updateAllSchedules(
+          classes: nextClasses,
+          tasks: nextTasks,
+          enableClassAlerts: nextAlerts,
+          enableMorningBriefing: nextMorning,
+          enableNightlyPreview: nextNightly,
+        );
+      }
+    }
+  }
+
+  /// Show an immediate notification (for class updates, schedule changes, or confirmations)
+  Future<void> showInstantNotification({
+    required String title,
+    required String body,
+    int? id,
+  }) async {
     if (!_isInitialized) await initialize();
 
-    await cancelAll();
+    const androidDetails = AndroidNotificationDetails(
+      classChannelId,
+      classChannelName,
+      channelDescription: classChannelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      icon: '@mipmap/ic_launcher',
+    );
 
-    if (enableClassAlerts && classes.isNotEmpty) {
-      await scheduleClassReminders(classes);
-    }
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
 
-    final now = DateTime.now();
-    final todayWeekday = now.weekday;
-    final tomorrowWeekday = (todayWeekday % 7) + 1;
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
-    // Build Morning Briefing text
-    if (enableMorningBriefing) {
-      final todayClasses = classes.where((c) => c.dayOfWeek == todayWeekday).toList();
-      final todayTasks = tasks.where((t) {
-        if (t.dueDate == null || t.isCompleted) return false;
-        return t.dueDate!.year == now.year &&
-            t.dueDate!.month == now.month &&
-            t.dueDate!.day == now.day;
-      }).toList();
-
-      String morningBody;
-      if (todayClasses.isEmpty && todayTasks.isEmpty) {
-        morningBody = 'No classes or pending tasks scheduled for today. Have a great day!';
-      } else {
-        final classStr = todayClasses.isNotEmpty
-            ? '${todayClasses.length} class(es)'
-            : 'No classes';
-        final taskStr = todayTasks.isNotEmpty
-            ? '${todayTasks.length} task(s) due'
-            : 'no pending tasks';
-        morningBody = 'You have $classStr and $taskStr today.';
-      }
-
-      await scheduleDailyMorningBriefing(body: morningBody);
-    }
-
-    // Build Nightly Preview text
-    if (enableNightlyPreview) {
-      final tomorrow = now.add(const Duration(days: 1));
-      final tomorrowClasses = classes.where((c) => c.dayOfWeek == tomorrowWeekday).toList();
-      final tomorrowTasks = tasks.where((t) {
-        if (t.dueDate == null || t.isCompleted) return false;
-        return t.dueDate!.year == tomorrow.year &&
-            t.dueDate!.month == tomorrow.month &&
-            t.dueDate!.day == tomorrow.day;
-      }).toList();
-
-      String nightlyBody;
-      if (tomorrowClasses.isEmpty && tomorrowTasks.isEmpty) {
-        nightlyBody = 'No classes or tasks scheduled for tomorrow.';
-      } else {
-        final classStr = tomorrowClasses.isNotEmpty
-            ? '${tomorrowClasses.length} class(es)'
-            : 'No classes';
-        final taskStr = tomorrowTasks.isNotEmpty
-            ? '${tomorrowTasks.length} task(s) due'
-            : 'no tasks';
-        nightlyBody = 'Tomorrow: $classStr, $taskStr.';
-      }
-
-      await scheduleNightlyPreview(body: nightlyBody);
-    }
+    final notifId = id ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    await _notificationsPlugin.show(
+      notifId,
+      title,
+      body,
+      notificationDetails,
+    );
   }
 
   /// Send immediate test notification
@@ -487,18 +634,26 @@ class NotificationService {
       channelDescription: classChannelDescription,
       importance: Importance.max,
       priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
       icon: '@mipmap/ic_launcher',
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
     );
 
     const notificationDetails = NotificationDetails(
       android: androidDetails,
-      iOS: DarwinNotificationDetails(),
+      iOS: iosDetails,
     );
 
     await _notificationsPlugin.show(
-      9999,
-      'Sentry Notifications Active',
-      'Class reminders and daily briefings are set up!',
+      testNotificationId,
+      '🔔 Sentry Notifications Active',
+      'Class reminders and schedule briefings are working properly on your mobile device!',
       notificationDetails,
     );
   }

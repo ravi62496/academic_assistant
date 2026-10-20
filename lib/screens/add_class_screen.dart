@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/class_schedule.dart';
 import '../models/course.dart';
 import '../providers/course_providers.dart';
+import '../providers/notification_providers.dart';
 import '../providers/timetable_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -115,7 +116,13 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
           endTime: endStr,
           room: _roomController.text.trim(),
         );
-        if (mounted) SnackbarUtils.showSuccess(context, 'Class schedule added');
+        if (mounted) {
+          SnackbarUtils.showSuccess(context, 'Class schedule added');
+          ref.read(notificationServiceProvider).showInstantNotification(
+            title: 'Class Scheduled & Reminder Active',
+            body: 'Reminder set for ${_daysShort[_selectedDayOfWeek - 1]} at $startStr (10 mins prior).',
+          );
+        }
       } else {
         await notifier.updateClass(
           widget.classSchedule!.copyWith(
@@ -126,7 +133,13 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
             room: _roomController.text.trim(),
           ),
         );
-        if (mounted) SnackbarUtils.showSuccess(context, 'Class schedule updated');
+        if (mounted) {
+          SnackbarUtils.showSuccess(context, 'Class schedule updated');
+          ref.read(notificationServiceProvider).showInstantNotification(
+            title: 'Class Schedule Updated',
+            body: 'Updated reminder set for ${_daysShort[_selectedDayOfWeek - 1]} at $startStr.',
+          );
+        }
       }
 
       if (mounted) Navigator.of(context).pop();

@@ -138,17 +138,40 @@ class AiAssistantService {
       debugPrint('Edge Function invoke failed or unavailable: $edgeError. Trying direct API fallback...');
     }
 
-    // 2. Direct API Fallback using NVIDIA API Key from .env
+    // 2. Direct API Fallback using GEMINI_API_KEY or NVIDIA_API_KEY from .env
+    final geminiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     final nvidiaKey = dotenv.env['NVIDIA_API_KEY'] ?? '';
-    if (nvidiaKey.isNotEmpty) {
+
+    if (geminiKey.isNotEmpty) {
       try {
-        return await _sendDirectNvidiaApiMessage(
+        return await _sendDirectApiMessage(
+          message: message,
+          imageBase64: imageBase64,
+          courses: courses,
+          classes: classes,
+          history: history,
+          apiKey: geminiKey,
+          endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          modelName: 'gemini-3.5-flash-lite',
+        );
+      } catch (geminiError) {
+        debugPrint('Direct Gemini API call error: $geminiError');
+        throw Exception('Failed to connect to Gemini AI Assistant: $geminiError');
+      }
+    } else if (nvidiaKey.isNotEmpty) {
+      try {
+        final model = (imageBase64 != null && imageBase64.isNotEmpty)
+            ? 'meta/llama-3.2-11b-vision-instruct'
+            : 'meta/llama-3.3-70b-instruct';
+        return await _sendDirectApiMessage(
           message: message,
           imageBase64: imageBase64,
           courses: courses,
           classes: classes,
           history: history,
           apiKey: nvidiaKey,
+          endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+          modelName: model,
         );
       } catch (directError) {
         debugPrint('Direct NVIDIA API call error: $directError');
@@ -157,7 +180,7 @@ class AiAssistantService {
     }
 
     throw Exception(
-        'AI Assistant service unavailable. Please ensure your network connection is active or check your .env configuration.');
+        'AI Assistant key missing. Please provide GEMINI_API_KEY or NVIDIA_API_KEY in your .env file, or deploy the Supabase Edge Function.');
   }
 
   AiResponse _parseResponseJson(Map<String, dynamic> jsonResponse) {
@@ -207,13 +230,15 @@ class AiAssistantService {
     );
   }
 
-  Future<AiResponse> _sendDirectNvidiaApiMessage({
+  Future<AiResponse> _sendDirectApiMessage({
     String? message,
     String? imageBase64,
     required List<Course> courses,
     required List<ClassSchedule> classes,
     List<Map<String, dynamic>>? history,
     required String apiKey,
+    required String endpoint,
+    required String modelName,
   }) async {
     final nowStr = DateTime.now().toIso8601String();
     final systemPrompt = '''You are Sentry, an AI Academic Assistant for a student app.
@@ -405,16 +430,13 @@ Your job:
       },
     ];
 
-    final modelName = imageBase64 != null && imageBase64.isNotEmpty
-        ? 'meta/llama-3.2-11b-vision-instruct'
-        : 'meta/llama-3.3-70b-instruct';
-
-    final uri = Uri.parse('https://integrate.api.nvidia.com/v1/chat/completions');
+    final uri = Uri.parse(endpoint);
     final response = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $apiKey',
+        'x-goog-api-key': apiKey,
       },
       body: jsonEncode({
         'model': modelName,

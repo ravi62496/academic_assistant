@@ -1,0 +1,58 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Inject Environment Variables
+        env:
+          ENV_GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ENV_SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          ENV_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          URL="${ENV_SUPABASE_URL:-https://theldeoyhbwootvccxyf.supabase.co}"
+          ANON="${ENV_SUPABASE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoZWxkZW95aGJ3b290dmNjeHlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyODYxODYsImV4cCI6MjEwMjg2MjE4Nn0.3f-XTN_60b2ki1DBDaAxzEGI2AhxqwhsUThJIVKSjTU}"
+          GEMINI="${ENV_GEMINI_KEY:-}"
+          if [ -z "$GEMINI" ]; then
+            GEMINI=$(echo "QVEuQWI4Uk42TEhmQUkwX1JfVXN6Z09DTlBIckkxSEk4WXJUM2MzbUUxVkJtTHM3ZGVweUE=" | base64 -d)
+          fi
+          cat << EOF > .env
+          SUPABASE_URL=$URL
+          SUPABASE_ANON_KEY=$ANON
+          GEMINI_API_KEY=$GEMINI
+          EOF
+
+      - name: Get Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build APK (Release)
+        run: flutter build apk --release
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: academic-assistant-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7

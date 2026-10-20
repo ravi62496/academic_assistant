@@ -41,6 +41,12 @@ class MainShell extends ConsumerWidget {
               duration: const Duration(seconds: 4),
             ),
           );
+
+          // Also trigger a system notification in status bar
+          ref.read(notificationServiceProvider).showInstantNotification(
+            title: '⚠️ Schedule Update: $course',
+            body: 'Your class for $course has been $action.',
+          );
         }
       });
     });
