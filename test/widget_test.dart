@@ -1,5 +1,8 @@
 import 'package:academic_assistant/models/class_schedule.dart';
+import 'package:academic_assistant/models/class_update.dart';
 import 'package:academic_assistant/models/course.dart';
+import 'package:academic_assistant/models/email_source.dart';
+import 'package:academic_assistant/models/mail_settings.dart';
 import 'package:academic_assistant/services/notification_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -171,5 +174,73 @@ void main() {
     expect(nextAlert.day, 23); // Friday Oct 23
     expect(nextAlert.hour, 13);
     expect(nextAlert.minute, 50);
+  });
+
+  test('ClassUpdate model parsing and category getters', () {
+    final quiz = ClassUpdate.fromMap({
+      'id': 'up-1',
+      'gmail_message_id': 'msg-101',
+      'type': 'quiz',
+      'title': 'Quiz 2 on Friday',
+      'course': 'Data Structures',
+      'starts_at': '2026-10-23T10:00:00Z',
+      'confidence': 0.95,
+      'status': 'confirmed',
+      'is_read': false,
+    });
+
+    expect(quiz.isTask, isTrue);
+    expect(quiz.isNotice, isFalse);
+    expect(quiz.typeLabel, 'Quiz');
+    expect(quiz.confidence, 0.95);
+
+    final cancelled = ClassUpdate.fromMap({
+      'id': 'up-2',
+      'gmail_message_id': 'msg-102',
+      'type': 'cancelled',
+      'title': 'Class Cancelled Today',
+      'course': 'Information Security',
+      'starts_at': '2026-10-21T11:30:00Z',
+      'confidence': 0.99,
+      'status': 'confirmed',
+      'is_read': false,
+    });
+
+    expect(cancelled.isTask, isFalse);
+    expect(cancelled.isNotice, isTrue);
+    expect(cancelled.typeLabel, 'Cancelled');
+  });
+
+  test('EmailSource model getters and domain detection', () {
+    final domainSource = EmailSource.fromMap({
+      'id': 's1',
+      'user_id': 'u1',
+      'kind': 'domain',
+      'value': '@iitmandi.ac.in',
+      'enabled': true,
+    });
+    expect(domainSource.isDomain, isTrue);
+    expect(domainSource.isAddress, isFalse);
+
+    final addressSource = EmailSource.fromMap({
+      'id': 's2',
+      'user_id': 'u1',
+      'kind': 'address',
+      'value': 'prof.smith@iitmandi.ac.in',
+      'enabled': true,
+    });
+    expect(addressSource.isDomain, isFalse);
+    expect(addressSource.isAddress, isTrue);
+  });
+
+  test('MailSettings model parsing and defaults', () {
+    final settings = MailSettings.fromMap({
+      'user_id': 'u1',
+      'mode': 'selected',
+      'sync_enabled': true,
+    });
+    expect(settings.mode, 'selected');
+    expect(settings.syncEnabled, isTrue);
+    expect(settings.dailyDigest, isFalse);
   });
 }

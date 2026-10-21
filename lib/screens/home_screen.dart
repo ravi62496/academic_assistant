@@ -14,6 +14,8 @@ import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/class_action_bottom_sheet.dart';
+import '../providers/mail_providers.dart';
+import 'mail/class_notices_screen.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -67,6 +69,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     ref.invalidate(timetableProvider);
     ref.invalidate(coursesProvider);
     ref.invalidate(tasksProvider);
+    ref.invalidate(classNoticesProvider);
+    ref.invalidate(classTasksProvider);
     _entranceController.reset();
     _entranceController.forward();
     if (mounted) {
@@ -599,6 +603,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
             onPressed: () => _showAddTaskDialog(context),
             icon: const Icon(Icons.add_task_outlined),
             tooltip: 'Add Task',
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              final unreadCount = ref.watch(unreadNoticesCountProvider);
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ClassNoticesScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Class Updates & Notices',
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           InkWell(
             onTap: _openProfile,

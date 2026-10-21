@@ -10,3 +10,4 @@
 -keepattributes *Annotation*
 -dontwarn com.dexterous.flutterlocalnotifications.**
 -dontwarn com.google.gson.**
+

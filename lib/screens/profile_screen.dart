@@ -8,8 +8,13 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/ai_node_icon.dart';
+import '../providers/mail_providers.dart';
 import 'cookies_policy_screen.dart';
 import 'login_screen.dart';
+import 'mail/class_notices_screen.dart';
+import 'mail/connect_gmail_screen.dart';
+import 'mail/email_settings_screen.dart';
+import 'mail/needs_review_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
 
@@ -23,140 +28,10 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final AuthService _authService = AuthService();
-  bool _readAllEmails = false;
-  List<Map<String, dynamic>> _emailFilters = [];
-  bool _isLoadingFilters = true;
 
   @override
   void initState() {
     super.initState();
-    _loadProfileSettings();
-    _loadEmailFilters();
-  }
-
-  Future<void> _loadProfileSettings() async {
-    try {
-      final profile = await _authService.getProfile();
-      if (profile != null && mounted) {
-        setState(() {
-          _readAllEmails = profile['read_all_emails'] ?? false;
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _loadEmailFilters() async {
-    try {
-      final filters = await _authService.getEmailFilters();
-      if (mounted) {
-        setState(() {
-          _emailFilters = filters;
-          _isLoadingFilters = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingFilters = false);
-    }
-  }
-
-  Future<void> _updateReadAllEmails(bool value) async {
-    setState(() => _readAllEmails = value);
-    try {
-      await _authService.updateReadAllEmails(value);
-      if (mounted) {
-        SnackbarUtils.showSuccess(context, 'Email scanning preference updated!');
-      }
-    } catch (e) {
-      setState(() => _readAllEmails = !value);
-      if (mounted) {
-        SnackbarUtils.showError(context, 'Failed to update preference: $e');
-      }
-    }
-  }
-
-  void _showAddFilterDialog() {
-    final emailController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    bool isSaving = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(
-              'Add Trusted Sender',
-              style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold),
-            ),
-            content: Form(
-              key: formKey,
-              child: TextFormField(
-                controller: emailController,
-                autofocus: true,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email Address',
-                  hintText: 'e.g., academics@iitmandi.ac.in',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Please enter an email address';
-                  }
-                  if (!val.contains('@') || !val.contains('.')) {
-                    return 'Please enter a valid email address';
-                  }
-                  return null;
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isSaving ? null : () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: isSaving
-                    ? null
-                    : () async {
-                        if (formKey.currentState?.validate() ?? false) {
-                          setModalState(() => isSaving = true);
-                          try {
-                            await _authService.addEmailFilter(emailController.text.trim());
-                            await _loadEmailFilters();
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                            if (mounted) SnackbarUtils.showSuccess(context, 'Trusted sender added successfully!');
-                          } catch (e) {
-                            if (ctx.mounted) SnackbarUtils.showError(ctx, e.toString());
-                          } finally {
-                            if (ctx.mounted) setModalState(() => isSaving = false);
-                          }
-                        }
-                      },
-                child: isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Text('Add'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _deleteFilter(String filterId) async {
-    try {
-      await _authService.deleteEmailFilter(filterId);
-      await _loadEmailFilters();
-      if (mounted) SnackbarUtils.showSuccess(context, 'Trusted sender removed');
-    } catch (e) {
-      if (mounted) SnackbarUtils.showError(context, 'Failed to remove: $e');
-    }
   }
 
   void _showEditNameDialog(String currentName) {
@@ -514,9 +389,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Email Scanning & Privacy
+            // Sentry Email Intelligence
             Text(
-              'Email Scanning & Privacy',
+              'Sentry Email Intelligence',
               style: GoogleFonts.spaceGrotesk(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -525,98 +400,209 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 10),
 
-            _buildSwitchTile(
-              context: context,
-              icon: Icons.mark_email_read_outlined,
-              iconColor: AppColors.primary,
-              title: 'Read All Inbox Emails',
-              subtitle: _readAllEmails
-                  ? 'Scanning all inbox messages for class cancellations/updates'
-                  : 'Scanning only specified trusted sender filters (Strict Privacy)',
-              value: _readAllEmails,
-              onChanged: _updateReadAllEmails,
-            ),
+            Consumer(
+              builder: (context, ref, _) {
+                final settingsAsync = ref.watch(mailSettingsProvider);
+                final pendingCount = ref.watch(pendingReviewCountProvider);
 
-            if (!_readAllEmails) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurface : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Trusted Senders List',
-                          style: GoogleFonts.spaceGrotesk(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                return settingsAsync.when(
+                  data: (settings) {
+                    final isConnected = settings != null;
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                         ),
-                        TextButton.icon(
-                          onPressed: _showAddFilterDialog,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Add Sender'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Sentry will only read emails from these specific senders.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_isLoadingFilters)
-                      const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
-                    else if (_emailFilters.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text(
-                          'No custom senders added yet. Default fallback: academics@iitmandi.ac.in',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.textSecondary,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isConnected
+                                      ? AppColors.sentryGreen.withValues(alpha: 0.15)
+                                      : AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  isConnected ? Icons.mark_email_read_rounded : Icons.mark_email_unread_outlined,
+                                  color: isConnected ? AppColors.sentryGreen : AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Class Email Monitoring',
+                                      style: GoogleFonts.spaceGrotesk(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      isConnected
+                                          ? (settings.syncEnabled ? 'Active · Mode: ${settings.mode}' : 'Sync Paused')
+                                          : 'Connect to detect cancellations & quizzes',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isConnected
+                                      ? (settings.syncEnabled
+                                          ? AppColors.sentryGreen.withValues(alpha: 0.15)
+                                          : Colors.orange.withValues(alpha: 0.15))
+                                      : Colors.grey.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isConnected
+                                      ? (settings.syncEnabled ? 'Connected' : 'Paused')
+                                      : 'Not Linked',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isConnected
+                                        ? (settings.syncEnabled ? AppColors.sentryGreen : Colors.orange)
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _emailFilters.length,
-                        separatorBuilder: (_, i) => const Divider(height: 1),
-                        itemBuilder: (ctx, index) {
-                          final filter = _emailFilters[index];
-                          return ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.alternate_email, size: 18, color: AppColors.primary),
-                            title: Text(
-                              filter['sender_email'] ?? '',
-                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13),
+                          const SizedBox(height: 14),
+
+                          if (isConnected) ...[
+                            if (pendingCount > 0) ...[
+                              InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const NeedsReviewScreen()),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.help_outline, color: Colors.orange, size: 16),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '$pendingCount update(s) require confirmation',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right, size: 16),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      minimumSize: Size.zero,
+                                    ),
+                                    icon: const Icon(Icons.feed_outlined, size: 16),
+                                    label: const Text('Updates Feed'),
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(builder: (_) => const ClassNoticesScreen()),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      minimumSize: Size.zero,
+                                    ),
+                                    icon: const Icon(Icons.settings_outlined, size: 16),
+                                    label: const Text('Manage'),
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(builder: (_) => const EmailSettingsScreen()),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                              onPressed: () => _deleteFilter(filter['id']),
+                          ] else ...[
+                            Text(
+                              'Sentry can read class cancellation and assignment emails while keeping your full inbox strictly private.',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                height: 1.35,
+                              ),
                             ),
-                          );
-                        },
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                ),
+                                icon: const Icon(Icons.link, size: 16),
+                                label: const Text('Connect Gmail Account'),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const ConnectGmailScreen()),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                  ],
-                ),
-              ),
-            ],
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
+                );
+              },
+            ),
 
             const SizedBox(height: 24),
 
