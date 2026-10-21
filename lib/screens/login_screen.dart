@@ -64,19 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleOAuthLogin(OAuthProvider provider) async {
     try {
-      if (provider == OAuthProvider.google) {
-        await _authService.signInWithOAuth(
-          provider,
-          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-          queryParams: {
-            'access_type': 'offline',
-            'prompt': 'consent',
-          },
-        );
-      } else {
-        await _authService.signInWithOAuth(provider);
-      }
-      await _authService.saveGmailRefreshToken();
+      await _authService.signInWithOAuth(provider);
     } catch (e) {
       if (mounted) {
         SnackbarUtils.showError(context, e.toString());

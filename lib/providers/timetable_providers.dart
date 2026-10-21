@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/class_schedule.dart';
 import '../services/cache_service.dart';
 import '../services/timetable_service.dart';
