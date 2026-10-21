@@ -1,0 +1,6 @@
+{
+  "deno.enablePaths": [
+    "./supabase/functions"
+  ],
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false
+}
