@@ -481,3 +481,4 @@ class _EmailSettingsScreenState extends ConsumerState<EmailSettingsScreen> {
     );
   }
 }
+

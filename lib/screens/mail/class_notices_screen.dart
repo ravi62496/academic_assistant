@@ -535,3 +535,4 @@ class _ClassNoticesScreenState extends ConsumerState<ClassNoticesScreen> {
     );
   }
 }
+

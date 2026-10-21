@@ -43,3 +43,4 @@ class EmailSource {
   bool get isDomain => kind == 'domain';
   bool get isAddress => kind == 'address';
 }
+

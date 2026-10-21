@@ -97,3 +97,4 @@ create policy "own tokens" on public.device_tokens
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- Note: gmail_credentials has NO client policy, meaning only service_role (Edge Functions) can access it.
+

@@ -52,3 +52,6 @@ app.*.map.json
 *.apk
 # Widget Preview related
 .widget_preview/
+
+# Supabase CLI temp files
+supabase/.temp/

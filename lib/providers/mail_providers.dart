@@ -62,3 +62,4 @@ final isGmailConnectedProvider = FutureProvider<bool>((ref) async {
   final repo = ref.watch(mailRepositoryProvider);
   return await repo.isGmailConnected();
 });
+

@@ -1,6 +1,4 @@
 {
-  "deno.enablePaths": [
-    "./supabase/functions"
-  ],
-  "typescript.tsserver.experimental.enableProjectDiagnostics": false
+  "typescript.validate.enable": false,
+  "javascript.validate.enable": false
 }

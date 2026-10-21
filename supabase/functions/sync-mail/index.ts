@@ -427,3 +427,4 @@ function extractCourse(text: string): string | null {
   const match = text.match(/\b([A-Z]{2,4}\s?-?\d{3,4})\b/);
   return match ? match[1].replace(/\s+/g, '') : null;
 }
+
