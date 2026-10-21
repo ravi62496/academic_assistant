@@ -286,7 +286,7 @@ class _NeedsReviewScreenState extends ConsumerState<NeedsReviewScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkCard : Colors.grey.shade100,
+                          color: isDark ? AppColors.darkSurfaceVariant : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

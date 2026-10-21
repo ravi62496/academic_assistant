@@ -161,7 +161,7 @@ class _ClassNoticesScreenState extends ConsumerState<ClassNoticesScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : Colors.grey.shade100,
+                  color: isDark ? AppColors.darkSurfaceVariant : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
