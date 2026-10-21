@@ -26,31 +26,6 @@ class MainShell extends ConsumerWidget {
     // Keep class & task notification reminders in sync automatically
     ref.watch(notificationSyncProvider);
 
-    // Listen to real-time class updates (cancellations/postponements)
-    ref.listen(classUpdatesStreamProvider, (previous, next) {
-      next.whenData((updates) {
-        if (updates.isNotEmpty) {
-          ref.invalidate(timetableProvider);
-          final latest = updates.last;
-          final course = latest['course'] ?? 'Course';
-          final action = latest['action'] ?? 'updated';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⚠️ $course class update: $action!'),
-              backgroundColor: AppColors.primary,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-
-          // Also trigger a system notification in status bar
-          ref.read(notificationServiceProvider).showInstantNotification(
-            title: '⚠️ Schedule Update: $course',
-            body: 'Your class for $course has been $action.',
-          );
-        }
-      });
-    });
-
     final activeIndex = ref.watch(activeTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

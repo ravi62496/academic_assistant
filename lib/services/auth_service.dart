@@ -118,66 +118,6 @@ class AuthService {
     }
   }
 
-  /// Link an additional Google account with offline access & gmail scope
-  Future<bool> linkAdditionalGoogleAccount() async {
-    return await signInWithOAuth(
-      OAuthProvider.google,
-      scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-      queryParams: {
-        'access_type': 'offline',
-        'prompt': 'consent',
-      },
-    );
-  }
-
-  /// Save provider refresh token to user_gmail_accounts table if present
-  Future<void> saveGmailRefreshToken() async {
-    try {
-      final session = _client.auth.currentSession;
-      if (session?.providerRefreshToken != null && session?.user.id != null) {
-        final userId = session!.user.id;
-        final refreshToken = session.providerRefreshToken!;
-        final googleEmail = session.user.email ?? session.user.userMetadata?['email'] ?? currentUser?.email ?? 'primary@gmail.com';
-
-        await _client.from('user_gmail_accounts').upsert({
-          'user_id': userId,
-          'google_email': googleEmail,
-          'refresh_token': refreshToken,
-        }, onConflict: 'user_id,google_email');
-
-        await _client.from('gmail_tokens').upsert({
-          'user_id': userId,
-          'refresh_token': refreshToken,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
-      }
-    } catch (e) {
-      debugPrint('Error saving gmail refresh token: $e');
-    }
-  }
-
-  /// Get all linked Gmail accounts for current user
-  Future<List<Map<String, dynamic>>> getLinkedGmailAccounts() async {
-    final userId = currentUser?.id;
-    if (userId == null) return [];
-    try {
-      final res = await _client
-          .from('user_gmail_accounts')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      debugPrint('Error fetching linked gmail accounts: $e');
-      return [];
-    }
-  }
-
-  /// Remove a linked Gmail account by ID
-  Future<void> removeLinkedGmailAccount(String accountId) async {
-    await _client.from('user_gmail_accounts').delete().eq('id', accountId);
-  }
-
   /// Send password reset email
   Future<void> resetPassword(String email) async {
     try {
@@ -234,50 +174,6 @@ class AuthService {
       debugPrint('Error fetching profile: $e');
       return null;
     }
-  }
-
-  /// Update read_all_emails preference in public.profiles table
-  Future<void> updateReadAllEmails(bool readAll) async {
-    final userId = currentUser?.id;
-    if (userId == null) throw Exception('User not authenticated');
-
-    await _client.from('profiles').upsert({
-      'id': userId,
-      'read_all_emails': readAll,
-    }, onConflict: 'id');
-  }
-
-  /// Get user's custom trusted email filters
-  Future<List<Map<String, dynamic>>> getEmailFilters() async {
-    final userId = currentUser?.id;
-    if (userId == null) return [];
-    try {
-      final res = await _client
-          .from('user_email_filters')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      debugPrint('Error fetching email filters: $e');
-      return [];
-    }
-  }
-
-  /// Add a trusted sender email filter
-  Future<void> addEmailFilter(String email) async {
-    final userId = currentUser?.id;
-    if (userId == null) throw Exception('User not authenticated');
-
-    await _client.from('user_email_filters').insert({
-      'user_id': userId,
-      'sender_email': email.trim().toLowerCase(),
-    });
-  }
-
-  /// Delete a trusted sender email filter by ID
-  Future<void> deleteEmailFilter(String filterId) async {
-    await _client.from('user_email_filters').delete().eq('id', filterId);
   }
 
   /// Update password for currently authenticated user
