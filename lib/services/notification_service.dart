@@ -221,6 +221,171 @@ class NotificationService {
     }
   }
 
+  /// Format 24h HH:mm or HH:mm:ss to a clean readable time string (e.g. "9:00 AM", "2:30 PM")
+  static String formatTimeDisplay(String timeStr) {
+    final trimmed = timeStr.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.toUpperCase().contains('AM') || trimmed.toUpperCase().contains('PM')) {
+      return trimmed;
+    }
+    try {
+      final parts = parseTimeString(trimmed);
+      final hour24 = parts[0];
+      final min = parts[1];
+      final period = hour24 >= 12 ? 'PM' : 'AM';
+      final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+      final minStr = min.toString().padLeft(2, '0');
+      return '$hour12:$minStr $period';
+    } catch (_) {
+      return trimmed;
+    }
+  }
+
+  /// Generate a concise subject acronym / short name from course name or code
+  /// Examples:
+  /// - "mathematical computation for data science" -> "MCDS"
+  /// - "information security and privacy" -> "ISP"
+  /// - "Data Structures & Algorithms" -> "DSA"
+  static String getSubjectShortName(String name, [String? code]) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      if (code != null && code.trim().isNotEmpty) {
+        return code.trim();
+      }
+      return 'Class';
+    }
+
+    // If already an acronym or short uppercase code (e.g. "MCDS", "CS101", "AI", "DBMS")
+    final cleanAlpha = trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    if (cleanAlpha.length <= 5 && trimmed == trimmed.toUpperCase()) {
+      return trimmed;
+    }
+
+    // Normalize punctuation and separators into spaces
+    final rawTokens = trimmed
+        .replaceAll(RegExp(r'[,.:;_/\-&]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    if (rawTokens.isEmpty) return trimmed;
+
+    // Common stop words to exclude when forming acronyms
+    const stopWords = {
+      'and', 'for', 'of', 'in', 'to', 'with', 'on', 'at', 'from', 'by',
+      'about', 'as', 'into', 'through', 'after', 'over', 'between', 'out',
+      'against', 'during', 'without', 'before', 'under', 'around', 'among',
+      'the', 'a', 'an', 'or', 'nor', 'but',
+    };
+
+    final meaningfulTokens = rawTokens
+        .where((t) => !stopWords.contains(t.toLowerCase()))
+        .toList();
+
+    final tokensToUse = meaningfulTokens.isNotEmpty ? meaningfulTokens : rawTokens;
+
+    if (tokensToUse.length == 1) {
+      final single = tokensToUse.first;
+      if (code != null && code.trim().isNotEmpty && code.trim().length <= 6) {
+        return code.trim();
+      }
+      return single;
+    }
+
+    // Multiple words: extract initials and keep numbers / roman numerals
+    final buffer = StringBuffer();
+    for (final token in tokensToUse) {
+      if (RegExp(r'^(I|II|III|IV|V|VI|VII|VIII|IX|X|\d+)$', caseSensitive: false).hasMatch(token)) {
+        buffer.write(token.toUpperCase());
+      } else {
+        final match = RegExp(r'[a-zA-Z0-9]').firstMatch(token);
+        if (match != null) {
+          buffer.write(match.group(0)!.toUpperCase());
+        }
+      }
+    }
+
+    final acronym = buffer.toString().trim();
+    return acronym.isNotEmpty ? acronym : trimmed;
+  }
+
+  /// Build a compact inline summary of classes: "9:00 AM MCDS • 11:30 AM ISP"
+  static String buildClassListSummary(List<ClassSchedule> classesList) {
+    if (classesList.isEmpty) return '';
+    final sorted = [...classesList]..sort((a, b) => a.startTime.compareTo(b.startTime));
+    return sorted.map((cs) {
+      final timeStr = formatTimeDisplay(cs.startTime);
+      final shortName = getSubjectShortName(
+        cs.course?.name ?? cs.course?.code ?? 'Class',
+        cs.course?.code,
+      );
+      return '$timeStr $shortName';
+    }).join(' • ');
+  }
+
+  /// Build an expanded multi-line breakdown of classes for rich notification views
+  static String buildClassListExpanded(String header, List<ClassSchedule> classesList) {
+    final sorted = [...classesList]..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final lines = <String>[header];
+    for (final cs in sorted) {
+      final timeStr = formatTimeDisplay(cs.startTime);
+      final shortName = getSubjectShortName(
+        cs.course?.name ?? cs.course?.code ?? 'Class',
+        cs.course?.code,
+      );
+      final roomInfo = (cs.room != null && cs.room!.trim().isNotEmpty)
+          ? ' in Room ${cs.room}'
+          : '';
+      lines.add('• $timeStr - $shortName$roomInfo');
+    }
+    return lines.join('\n');
+  }
+
+  /// Calculate the next upcoming 10-minute pre-class reminder date/time
+  static tz.TZDateTime calculateNextAlertTime({
+    required int dayOfWeek,
+    required String startTime,
+    required tz.TZDateTime from,
+  }) {
+    final timeParts = parseTimeString(startTime);
+    final classHour = timeParts[0];
+    final classMin = timeParts[1];
+
+    final classTotalMins = classHour * 60 + classMin;
+    final alertTotalMins = classTotalMins - 10;
+
+    int alertHour = alertTotalMins ~/ 60;
+    int alertMin = alertTotalMins % 60;
+    int dayOffset = 0;
+
+    if (alertTotalMins < 0) {
+      alertHour += 24;
+      dayOffset = -1;
+    }
+
+    int targetDayOfWeek = dayOfWeek + dayOffset;
+    if (targetDayOfWeek < 1) targetDayOfWeek += 7;
+    if (targetDayOfWeek > 7) targetDayOfWeek -= 7;
+
+    int daysUntilAlert = targetDayOfWeek - from.weekday;
+    if (daysUntilAlert < 0) daysUntilAlert += 7;
+
+    var scheduledDate = tz.TZDateTime(
+      from.location,
+      from.year,
+      from.month,
+      from.day,
+      alertHour,
+      alertMin,
+    ).add(Duration(days: daysUntilAlert));
+
+    if (scheduledDate.isBefore(from)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 7));
+    }
+
+    return scheduledDate;
+  }
+
   /// Safe zoned schedule helper trying alarmClock -> exactAllowWhileIdle -> inexactAllowWhileIdle
   Future<void> _zonedScheduleWithFallback({
     required int id,
@@ -312,139 +477,45 @@ class NotificationService {
       ),
     );
 
+    // Deduplicate by class ID to avoid duplicate notifications
+    final uniqueClasses = <String, ClassSchedule>{};
     for (final cs in classes) {
-      final timeParts = parseTimeString(cs.startTime);
-      final classHour = timeParts[0];
-      final classMin = timeParts[1];
+      uniqueClasses[cs.id] = cs;
+    }
 
-      // Calculate class start time in total minutes from midnight
-      final classTotalMins = classHour * 60 + classMin;
-      final alertTotalMins = classTotalMins - 10;
+    final usedIds = <int>{};
 
-      int alertHour = alertTotalMins ~/ 60;
-      int alertMin = alertTotalMins % 60;
-      int dayOffset = 0;
+    for (final cs in uniqueClasses.values) {
+      final scheduledDate = calculateNextAlertTime(
+        dayOfWeek: cs.dayOfWeek,
+        startTime: cs.startTime,
+        from: now,
+      );
 
-      if (alertTotalMins < 0) {
-        // Alert falls on previous day
-        alertHour += 24;
-        dayOffset = -1;
-      }
-
-      // Find upcoming target day of week
-      int targetDayOfWeek = cs.dayOfWeek + dayOffset;
-      if (targetDayOfWeek < 1) targetDayOfWeek += 7;
-      if (targetDayOfWeek > 7) targetDayOfWeek -= 7;
-
-      int daysUntilClass = targetDayOfWeek - now.weekday;
-      if (daysUntilClass < 0) daysUntilClass += 7;
-
-      var scheduledDate = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        alertHour,
-        alertMin,
-      ).add(Duration(days: daysUntilClass));
-
-      // Calculate actual class start date/time
-      int daysUntilActualClass = cs.dayOfWeek - now.weekday;
-      if (daysUntilActualClass < 0) daysUntilActualClass += 7;
-
-      final classStartDate = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        classHour,
-        classMin,
-      ).add(Duration(days: daysUntilActualClass));
-
-      final courseName = cs.course?.name ?? cs.course?.code ?? 'Upcoming Class';
+      final shortName = getSubjectShortName(
+        cs.course?.name ?? cs.course?.code ?? 'Upcoming Class',
+        cs.course?.code,
+      );
       final roomInfo = (cs.room != null && cs.room!.trim().isNotEmpty)
           ? ' in Room ${cs.room}'
           : '';
+      final timeFormatted = formatTimeDisplay(cs.startTime);
 
-      final baseId = (cs.id.hashCode.abs() % 400000) + 2000;
-      final oneShotId = baseId;
-      final recurringId = baseId + 400000;
-
-      // Case 1: Alert is today and in the future (e.g. class in 15 mins -> alert in 5 mins)
-      if (daysUntilClass == 0 && scheduledDate.isAfter(now)) {
-        // Schedule exact one-shot alarm today to guarantee immediate firing
-        await _zonedScheduleWithFallback(
-          id: oneShotId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: scheduledDate,
-          notificationDetails: notificationDetails,
-        );
-
-        // Schedule weekly recurring alarm starting from next week
-        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
-        await _zonedScheduleWithFallback(
-          id: recurringId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: nextWeekDate,
-          notificationDetails: notificationDetails,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        );
+      int notificationId = (cs.id.hashCode.abs() % 800000) + 2000;
+      while (usedIds.contains(notificationId)) {
+        notificationId++;
       }
-      // Case 2: 10-minute alert time has passed, but class starts within the next 10 minutes today
-      else if (daysUntilClass == 0 && scheduledDate.isBefore(now) && classStartDate.isAfter(now)) {
-        await _zonedScheduleWithFallback(
-          id: oneShotId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: now.add(const Duration(seconds: 2)),
-          notificationDetails: notificationDetails,
-        );
+      usedIds.add(notificationId);
 
-        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
-        await _zonedScheduleWithFallback(
-          id: recurringId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: nextWeekDate,
-          notificationDetails: notificationDetails,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        );
-      }
-      // Case 3: Today's class and alert have already passed
-      else if (daysUntilClass == 0 && scheduledDate.isBefore(now)) {
-        final nextWeekDate = scheduledDate.add(const Duration(days: 7));
-        await _zonedScheduleWithFallback(
-          id: recurringId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: nextWeekDate,
-          notificationDetails: notificationDetails,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        );
-      }
-      // Case 4: Future day of the week
-      else {
-        // Schedule one-shot for upcoming occurrence
-        await _zonedScheduleWithFallback(
-          id: oneShotId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: scheduledDate,
-          notificationDetails: notificationDetails,
-        );
-
-        // And schedule recurring weekly
-        await _zonedScheduleWithFallback(
-          id: recurringId,
-          title: 'Class Starting Soon: $courseName',
-          body: 'Starts in 10 minutes at ${cs.startTime}$roomInfo',
-          scheduledDate: scheduledDate.add(const Duration(days: 7)),
-          notificationDetails: notificationDetails,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        );
-      }
+      // Schedule a single weekly recurring reminder per class
+      await _zonedScheduleWithFallback(
+        id: notificationId,
+        title: 'Class Starting Soon: $shortName',
+        body: 'Starts in 10 minutes at $timeFormatted$roomInfo',
+        scheduledDate: scheduledDate,
+        notificationDetails: notificationDetails,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
     }
   }
 
@@ -456,28 +527,6 @@ class NotificationService {
     required bool enableNightlyPreview,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
-
-    const androidDailyDetails = AndroidNotificationDetails(
-      dailyChannelId,
-      dailyChannelName,
-      channelDescription: dailyChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-      icon: '@mipmap/ic_launcher',
-      category: AndroidNotificationCategory.reminder,
-      visibility: NotificationVisibility.public,
-    );
-
-    const dailyNotificationDetails = NotificationDetails(
-      android: androidDailyDetails,
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
-    );
 
     for (int weekday = 1; weekday <= 7; weekday++) {
       final dayName = _getDayName(weekday);
@@ -501,22 +550,55 @@ class NotificationService {
           morningDate = morningDate.add(const Duration(days: 7));
         }
 
+        final morningTitle = '🌅 $dayName Schedule Briefing';
         String morningBody;
+        String? morningExpanded;
+
         if (dayClasses.isEmpty) {
           morningBody = 'No classes scheduled for $dayName. Have a productive day!';
         } else {
-          final first = dayClasses.first;
-          final courseName = first.course?.name ?? first.course?.code ?? 'First class';
-          morningBody = 'You have ${dayClasses.length} class(es) today. Starting with $courseName at ${first.startTime}.';
+          final summary = buildClassListSummary(dayClasses);
+          morningBody = '${dayClasses.length} class${dayClasses.length == 1 ? '' : 'es'} today: $summary';
+          morningExpanded = buildClassListExpanded(
+            '📅 $dayName Schedule (${dayClasses.length} class${dayClasses.length == 1 ? '' : 'es'}):',
+            dayClasses,
+          );
         }
+
+        final morningDetails = NotificationDetails(
+          android: AndroidNotificationDetails(
+            dailyChannelId,
+            dailyChannelName,
+            channelDescription: dailyChannelDescription,
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: '@mipmap/ic_launcher',
+            category: AndroidNotificationCategory.reminder,
+            visibility: NotificationVisibility.public,
+            styleInformation: morningExpanded != null
+                ? BigTextStyleInformation(
+                    morningExpanded,
+                    contentTitle: morningTitle,
+                    summaryText: '${dayClasses.length} class(es)',
+                  )
+                : null,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        );
 
         final morningId = morningBriefingBaseId + weekday;
         await _zonedScheduleWithFallback(
           id: morningId,
-          title: '🌅 $dayName Schedule Briefing',
+          title: morningTitle,
           body: morningBody,
           scheduledDate: morningDate,
-          notificationDetails: dailyNotificationDetails,
+          notificationDetails: morningDetails,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         );
       }
@@ -543,22 +625,55 @@ class NotificationService {
           nightlyDate = nightlyDate.add(const Duration(days: 7));
         }
 
+        final nightlyTitle = '🌙 Tomorrow\'s Preview ($tomorrowName)';
         String nightlyBody;
+        String? nightlyExpanded;
+
         if (tomorrowClasses.isEmpty) {
           nightlyBody = 'No classes scheduled for tomorrow ($tomorrowName). Rest well!';
         } else {
-          final first = tomorrowClasses.first;
-          final courseName = first.course?.name ?? first.course?.code ?? 'First class';
-          nightlyBody = 'Tomorrow: ${tomorrowClasses.length} class(es). First up: $courseName at ${first.startTime}.';
+          final summary = buildClassListSummary(tomorrowClasses);
+          nightlyBody = 'Tomorrow ($tomorrowName): $summary';
+          nightlyExpanded = buildClassListExpanded(
+            '🌙 Tomorrow\'s Schedule - $tomorrowName (${tomorrowClasses.length} class${tomorrowClasses.length == 1 ? '' : 'es'}):',
+            tomorrowClasses,
+          );
         }
+
+        final nightlyDetails = NotificationDetails(
+          android: AndroidNotificationDetails(
+            dailyChannelId,
+            dailyChannelName,
+            channelDescription: dailyChannelDescription,
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: '@mipmap/ic_launcher',
+            category: AndroidNotificationCategory.reminder,
+            visibility: NotificationVisibility.public,
+            styleInformation: nightlyExpanded != null
+                ? BigTextStyleInformation(
+                    nightlyExpanded,
+                    contentTitle: nightlyTitle,
+                    summaryText: '${tomorrowClasses.length} class(es)',
+                  )
+                : null,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        );
 
         final nightlyId = nightlyPreviewBaseId + weekday;
         await _zonedScheduleWithFallback(
           id: nightlyId,
-          title: '🌙 Tomorrow\'s Preview ($tomorrowName)',
+          title: nightlyTitle,
           body: nightlyBody,
           scheduledDate: nightlyDate,
-          notificationDetails: dailyNotificationDetails,
+          notificationDetails: nightlyDetails,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         );
       }

@@ -50,3 +50,5 @@ app.*.map.json
 
 
 *.apk
+# Widget Preview related
+.widget_preview/

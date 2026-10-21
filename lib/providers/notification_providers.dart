@@ -93,7 +93,7 @@ final notificationSyncProvider = Provider<void>((ref) {
   final taskState = ref.watch(tasksProvider);
 
   // Guard: Avoid clearing or scheduling notifications while timetable or tasks are still in initial loading state
-  if (!timetableState.hasValue && !taskState.hasValue) {
+  if (!timetableState.hasValue || !taskState.hasValue) {
     return;
   }
 
